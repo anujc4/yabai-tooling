@@ -10,9 +10,17 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
-// Runs once per yabai event and must exit fast; nothing else is set up.
+func value(after flag: String) -> String? {
+    guard let index = arguments.firstIndex(of: flag), arguments.index(after: index) < arguments.endIndex
+    else { return nil }
+    return arguments[arguments.index(after: index)]
+}
+
+// Runs once per yabai event and must exit fast; nothing else is set up. The
+// socket path is passed in rather than re-derived: this runs under yabai's
+// environment, which need not carry USER or any override the daemon saw.
 if arguments.contains("--notify") {
-    try? NotificationSocket.notify(path: NotificationSocket.defaultPath())
+    try? NotificationSocket.notify(path: value(after: "--socket") ?? NotificationSocket.defaultPath())
     exit(0)
 }
 
@@ -37,18 +45,48 @@ case .run(let parsed):
 
 let client = YabaiClient(transport: YabaiSocketTransport())
 let detector = StackDetector(minStackSize: configuration.minStackSize)
+let socketPath = NotificationSocket.defaultPath()
 
-// Accessory policy: no Dock icon and no menu bar, so this behaves like borders
-// when launched from yabairc.
+// Another daemon holding the socket would otherwise be silently disabled: our
+// listen() unlinks the path, and our registration loop replaces its signals.
+if NotificationSocket.isServed(path: socketPath) {
+    fail("another yabai-stacks is already running on \(socketPath)")
+}
+
 let application = NSApplication.shared
 application.setActivationPolicy(.accessory)
 
 let controller = OverlayController(configuration: configuration)
 controller.onSelect = { id in
-    // The only write this program ever performs. Focusing does not change the
-    // layout, which is why it is the only non-query command in YabaiCommand.
     try? client.focusWindow(id: id)
 }
+
+let socket = NotificationSocket(path: socketPath)
+let executable = ExecutablePath.resolved(argv0: CommandLine.arguments.first)
+
+// Touched from the main queue during normal operation and once more from the
+// atexit handler, by which point every other thread is gone.
+nonisolated(unsafe) var registered = false
+nonisolated(unsafe) var tornDown = false
+
+func register() {
+    for event in YabaiSignalEvent.allCases {
+        // Replace rather than accumulate: a run killed with SIGKILL leaves its
+        // signals behind, and yabai will happily hold two under one label.
+        client.removeSignal(event)
+        try? client.addSignal(event, notifying: executable, socket: socketPath)
+    }
+    registered = true
+}
+
+func teardown() {
+    guard !tornDown else { return }
+    tornDown = true
+    for event in YabaiSignalEvent.allCases { client.removeSignal(event) }
+    socket.stop()
+}
+
+atexit { teardown() }
 
 @MainActor
 func refresh() {
@@ -57,14 +95,19 @@ func refresh() {
         let spaces = try client.spaces()
         let displays = try client.displays()
         controller.apply(stacks: detector.detect(windows: windows, spaces: spaces), displays: displays)
+
+        // A yabai restart wipes its signal table, so a refresh that succeeds
+        // after a failure is the moment to put our signals back.
+        if !registered { register() }
     } catch {
-        // A refresh can race a yabai restart. Dropping one is recoverable; the
-        // next event repaints. Exiting would leave the user with no overlays.
+        // Dropping one repaint is recoverable; the next event repaints. Exiting
+        // would leave the user with no overlays at all.
+        registered = false
         FileHandle.standardError.write(Data("yabai-stacks: refresh failed: \(error)\n".utf8))
     }
 }
 
-/// yabai fires several signals for one user action — creating a window emits
+/// yabai emits several signals per user action — creating a window fires
 /// window_created, then window_focused, then application_front_switched. One
 /// repaint per burst is enough, and coalescing keeps a drag from re-querying
 /// on every frame.
@@ -79,35 +122,17 @@ func scheduleRefresh() {
     DispatchQueue.main.asyncAfter(deadline: .now() + coalesceInterval, execute: work)
 }
 
-let socket = NotificationSocket(path: NotificationSocket.defaultPath())
 do {
     try socket.listen { DispatchQueue.main.async { scheduleRefresh() } }
 } catch {
-    fail("could not open notification socket at \(socket.path): \(error)")
+    fail("could not open notification socket at \(socketPath): \(error)")
 }
 
-let executable = CommandLine.arguments.first.map {
-    URL(fileURLWithPath: $0).standardizedFileURL.path
-} ?? "yabai-stacks"
-
-for event in YabaiSignalEvent.allCases {
-    // Replace rather than accumulate: a previous run that was killed leaves its
-    // signals behind, and yabai happily registers a second one under the label.
-    client.removeSignal(event)
-    do {
-        try client.addSignal(event, notifying: executable)
-    } catch {
-        fail("could not register yabai signal \(event.rawValue): \(error)")
-    }
-}
-
-func teardown() {
-    for event in YabaiSignalEvent.allCases { client.removeSignal(event) }
-    socket.stop()
-}
+register()
 
 // DispatchSource rather than signal(2): the handler runs on a normal queue, so
-// it can safely talk to yabai and AppKit instead of being async-signal-safe.
+// it can talk to yabai and AppKit instead of being restricted to
+// async-signal-safe calls.
 let terminationSources = [SIGINT, SIGTERM].map { number -> DispatchSourceSignal in
     signal(number, SIG_IGN)
     let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
@@ -119,19 +144,49 @@ let terminationSources = [SIGINT, SIGTERM].map { number -> DispatchSourceSignal 
     return source
 }
 
-NSWorkspace.shared.notificationCenter.addObserver(
+let workspace = NSWorkspace.shared.notificationCenter
+workspace.addObserver(
     forName: NSWorkspace.activeSpaceDidChangeNotification,
     object: nil,
     queue: .main
 ) { _ in
-    MainActor.assumeIsolated { scheduleRefresh() }
+    MainActor.assumeIsolated {
+        controller.setHidden(false, animated: true)
+        scheduleRefresh()
+    }
 }
 
-atexit { teardown() }
+// Mission Control has no public API. The Dock takes over the screen for its
+// duration, so its activation is the closest observable proxy; the overlays
+// slide away while it is up and return when the Dock resigns.
+workspace.addObserver(
+    forName: NSWorkspace.didActivateApplicationNotification,
+    object: nil,
+    queue: .main
+) { note in
+    guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+          app.bundleIdentifier == "com.apple.dock"
+    else { return }
+    MainActor.assumeIsolated { controller.setHidden(true, animated: true) }
+}
+
+workspace.addObserver(
+    forName: NSWorkspace.didDeactivateApplicationNotification,
+    object: nil,
+    queue: .main
+) { note in
+    guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+          app.bundleIdentifier == "com.apple.dock"
+    else { return }
+    MainActor.assumeIsolated {
+        controller.setHidden(false, animated: true)
+        scheduleRefresh()
+    }
+}
 
 refresh()
 FileHandle.standardError.write(
-    Data("yabai-stacks: listening on \(socket.path), \(controller.panelCount) overlay(s)\n".utf8)
+    Data("yabai-stacks: listening on \(socketPath), \(controller.panelCount) overlay(s)\n".utf8)
 )
 
 _ = terminationSources

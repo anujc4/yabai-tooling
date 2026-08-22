@@ -9,6 +9,13 @@ enum YabaiWireFormat {
         encode(argv: command.argv)
     }
 
+    /// NUL is the argv delimiter, so an element containing one would silently
+    /// become several on the wire and defeat the audit that reads argv as
+    /// `[String]`.
+    static func containsDelimiter(_ argv: [String]) -> Bool {
+        argv.contains { $0.utf8.contains(0) }
+    }
+
     static func encode(argv: [String]) -> Data {
         var payload = Data()
         for argument in argv {

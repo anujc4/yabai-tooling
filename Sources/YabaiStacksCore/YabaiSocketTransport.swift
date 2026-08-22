@@ -49,6 +49,9 @@ public struct YabaiSocketTransport: YabaiTransport {
     }
 
     public func send(_ command: YabaiCommand) throws -> Data {
+        guard !YabaiWireFormat.containsDelimiter(command.argv) else {
+            throw YabaiError.argumentContainsDelimiter
+        }
         let deadline = Deadline(after: timeout)
 
         let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)

@@ -1,3 +1,5 @@
+import Foundation
+
 /// The yabai events worth a refresh. Anything that can add, remove, move or
 /// re-stack a window, plus the ones that change which space is visible.
 public enum YabaiSignalEvent: String, Hashable, Sendable, CaseIterable {
@@ -20,6 +22,24 @@ public enum YabaiSignalEvent: String, Hashable, Sendable, CaseIterable {
     /// same table, so a label this program can spell is a label it could later
     /// remove; deriving every one of them makes that impossible.
     public var label: String { "\(Self.labelPrefix)\(rawValue)" }
+}
+
+public enum ExecutablePath {
+    /// argv[0] is whatever the caller typed, so a PATH-launched daemon sees a
+    /// bare "yabai-stacks" that URL(fileURLWithPath:) would resolve against the
+    /// working directory. yabai would then exec a file that does not exist and
+    /// every event would be silently lost.
+    public static func resolved(argv0: String?) -> String {
+        var size = UInt32(4096)
+        var buffer = [CChar](repeating: 0, count: Int(size))
+        if _NSGetExecutablePath(&buffer, &size) == 0 {
+            let path = String(cString: buffer)
+            if !path.isEmpty {
+                return URL(fileURLWithPath: path).standardizedFileURL.path
+            }
+        }
+        return argv0 ?? "yabai-stacks"
+    }
 }
 
 enum ShellQuoting {

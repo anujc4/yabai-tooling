@@ -42,7 +42,7 @@ public struct StackDetector: Sendable {
             )
         }
 
-        // Dictionary iteration order is not stable across runs; M4 diffs these.
+        // Dictionary iteration order is not stable across runs; the reconciler diffs these.
         return stacks.sorted(by: Self.precedes)
     }
 

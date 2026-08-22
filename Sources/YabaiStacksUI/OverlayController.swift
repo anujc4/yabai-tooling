@@ -10,9 +10,9 @@ public final class OverlayController {
     private let icons: AppIconProvider
     private var panels: [StackKey: StripPanel] = [:]
     private var rendered: [StackKey: StripRender] = [:]
+    private var isHidden = false
 
-    /// Called with the window id behind a clicked icon. M5 supplies the handler
-    /// that asks yabai to focus it.
+    /// Called with the window id behind a clicked icon.
     public var onSelect: ((Int) -> Void)?
 
     public init(configuration: Configuration, scale: Double = Double(NSScreen.main?.backingScaleFactor ?? 2)) {
@@ -61,6 +61,10 @@ public final class OverlayController {
         rendered = diff.rendered
     }
 
+    static func screenRect(for render: StripRender, primaryDisplayHeight: Double) -> NSRect {
+        StripPanel.screenRect(for: render, primaryDisplayHeight: primaryDisplayHeight)
+    }
+
     private func create(_ render: StripRender, height: Double) {
         let panel = StripPanel(
             render: render,
@@ -70,7 +74,35 @@ public final class OverlayController {
         )
         panel.onSelect = { [weak self] id in self?.onSelect?(id) }
         panel.orderFrontRegardless()
+        if isHidden {
+            panel.slide(to: Self.offScreen(panel.frame), animated: false)
+        }
         panels[render.key] = panel
+    }
+
+    /// Mission Control draws over everything, and a floating panel sitting on
+    /// top of it looks pinned to the glass. Sliding the strips off their own
+    /// display edge and back reads as them getting out of the way.
+    public func setHidden(_ hidden: Bool, animated: Bool) {
+        guard hidden != isHidden else { return }
+        isHidden = hidden
+
+        for (key, panel) in panels {
+            guard let render = rendered[key] else { continue }
+            let onScreen = Self.screenRect(for: render, primaryDisplayHeight: primaryDisplayHeight)
+            let target = hidden ? Self.offScreen(onScreen) : onScreen
+            panel.slide(to: target, animated: animated)
+        }
+    }
+
+    /// Leaves the strip travelling towards the nearest horizontal edge of the
+    /// screen it is on, so it exits the way it came in.
+    private static func offScreen(_ rect: NSRect) -> NSRect {
+        let screen = NSScreen.screens.first { $0.frame.intersects(rect) } ?? NSScreen.screens.first
+        guard let bounds = screen?.frame else { return rect.offsetBy(dx: -rect.width * 2, dy: 0) }
+        let exitsLeft = rect.midX < bounds.midX
+        let dx = exitsLeft ? bounds.minX - rect.maxX - 8 : bounds.maxX - rect.minX + 8
+        return rect.offsetBy(dx: dx, dy: 0)
     }
 
     public func removeAll() {

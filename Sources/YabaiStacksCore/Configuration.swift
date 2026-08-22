@@ -25,6 +25,7 @@ public struct Configuration: Hashable, Sendable {
     public var offsetX: Double
     public var offsetY: Double
     public var minStackSize: Int
+    public var titlebarInset: Double
 
     public init(
         iconSize: Double = 28,
@@ -39,7 +40,8 @@ public struct Configuration: Hashable, Sendable {
         orientation: StripOrientation = .vertical,
         offsetX: Double = 0,
         offsetY: Double = 0,
-        minStackSize: Int = 2
+        minStackSize: Int = 2,
+        titlebarInset: Double = 78
     ) {
         self.iconSize = iconSize
         self.iconSpacing = iconSpacing
@@ -54,6 +56,7 @@ public struct Configuration: Hashable, Sendable {
         self.offsetX = offsetX
         self.offsetY = offsetY
         self.minStackSize = minStackSize
+        self.titlebarInset = titlebarInset
     }
 
     /// Only `--icon-size` must be strictly positive; a zero gap, corner radius
@@ -70,6 +73,7 @@ public struct Configuration: Hashable, Sendable {
         try Self.require(padding, in: 0...Self.maximumLength, flag: "--padding")
         try Self.require(cornerRadius, in: 0...Self.maximumLength, flag: "--corner-radius")
         try Self.require(borderWidth, in: 0...Self.maximumLength, flag: "--border-width")
+        try Self.require(titlebarInset, in: 0...Self.maximumOffset, flag: "--titlebar-inset")
         try Self.require(offsetX, in: -Self.maximumOffset...Self.maximumOffset, flag: "--offset-x")
         try Self.require(offsetY, in: -Self.maximumOffset...Self.maximumOffset, flag: "--offset-y")
 

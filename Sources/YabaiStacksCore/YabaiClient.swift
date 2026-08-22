@@ -26,8 +26,8 @@ public struct YabaiClient: Sendable {
         _ = try transport.send(.focusWindow(id: id))
     }
 
-    public func addSignal(_ event: YabaiSignalEvent, notifying executable: String) throws {
-        _ = try transport.send(.addSignal(event: event, notifying: executable))
+    public func addSignal(_ event: YabaiSignalEvent, notifying executable: String, socket: String) throws {
+        _ = try transport.send(.addSignal(event: event, notifying: executable, socket: socket))
     }
 
     /// Removing a signal we never added is not an error worth failing over:

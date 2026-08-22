@@ -18,7 +18,7 @@ final class StripView: NSView {
 
     private(set) var render: StripRender
 
-    /// Set by the owning panel; M5 turns a click into a yabai focus request.
+    /// Set by the owning panel; turns a click into a yabai focus request.
     var onSelect: ((Int) -> Void)?
 
     init(render: StripRender, configuration: Configuration, icons: AppIconProvider) {
@@ -37,6 +37,11 @@ final class StripView: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
+
+    /// Icon rects are computed in yabai's top-left-origin space, so the view
+    /// has to share that origin. Unflipped, a vertical strip would render its
+    /// first member at the bottom, and clicks would agree with the wrong order.
+    override var isFlipped: Bool { true }
 
     func apply(render: StripRender, icons: AppIconProvider) {
         self.render = render
@@ -149,13 +154,25 @@ final class StripPanel: NSPanel {
         set { stripView.onSelect = newValue }
     }
 
+    func slide(to rect: NSRect, animated: Bool) {
+        guard animated else {
+            setFrame(rect, display: false)
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.22
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            animator().setFrame(rect, display: false)
+        }
+    }
+
     func apply(render: StripRender, icons: AppIconProvider, primaryDisplayHeight: Double) {
         setFrame(Self.screenRect(for: render, primaryDisplayHeight: primaryDisplayHeight), display: false)
         stripView.frame = NSRect(origin: .zero, size: frame.size)
         stripView.apply(render: render, icons: icons)
     }
 
-    private static func screenRect(for render: StripRender, primaryDisplayHeight: Double) -> NSRect {
+    static func screenRect(for render: StripRender, primaryDisplayHeight: Double) -> NSRect {
         let rect = Geometry.appKitRect(
             fromYabai: render.layout.frame,
             primaryDisplayHeight: primaryDisplayHeight

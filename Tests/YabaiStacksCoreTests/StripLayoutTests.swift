@@ -5,7 +5,7 @@ import Testing
 @Suite("Strip geometry")
 struct StripGeometryTests {
     /// This suite pins horizontal placement; vertical has its own suite.
-    private let defaults = Configuration(iconSize: 18, orientation: .horizontal)
+    private let defaults = Configuration(iconSize: 18, orientation: .horizontal, titlebarInset: 0)
     private let stackFrame = Rect(x: 10, y: 50, width: 1780, height: 1079)
     private let displayFrame = Rect(x: 0, y: 0, width: 1800, height: 1169)
     private let ids = [732842, 783797, 783800, 783803]
@@ -43,7 +43,8 @@ struct StripGeometryTests {
             position: position,
             orientation: .horizontal,
             offsetX: offsetX,
-            offsetY: offsetY
+            offsetY: offsetY,
+            titlebarInset: 0
         )
     }
 

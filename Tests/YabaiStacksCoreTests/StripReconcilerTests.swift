@@ -5,7 +5,7 @@ import Testing
 @Suite("Strip reconciliation")
 struct StripReconcilerTests {
     private let displays = [YabaiDisplay(index: 1, uuid: "D1", frame: YabaiFrame(x: 0, y: 0, w: 1800, h: 1169))]
-    private let configuration = Configuration()
+    private let configuration = Configuration(titlebarInset: 0)
 
     private func stack(
         space: Int = 2,

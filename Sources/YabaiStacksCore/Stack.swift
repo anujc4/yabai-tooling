@@ -57,9 +57,9 @@ extension StackKey: Comparable {
     }
 }
 
-/// One detected stack on a visible space. `Equatable` so M4 can diff two
-/// refreshes; `activeWindowID` is optional because a stack whose space is not
-/// the focused one legitimately has no active member (SPEC 5).
+/// One detected stack on a visible space. `Equatable` so two refreshes can be
+/// diffed; `activeWindowID` is optional because a stack whose space is not the
+/// focused one legitimately has no active member (SPEC 5).
 public struct Stack: Hashable, Sendable {
     public let space: Int
     public let display: Int

@@ -53,7 +53,7 @@ struct CommandWhitelistTests {
         commands.append(contentsOf: [.focusWindow(id: 0), .focusWindow(id: 577003), .focusWindow(id: -1)])
 
         for event in YabaiSignalEvent.allCases {
-            commands.append(.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks"))
+            commands.append(.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks", socket: "/tmp/s.sock"))
             commands.append(.removeSignal(event: event))
         }
         for command in commands {
@@ -97,7 +97,7 @@ struct CommandWhitelistTests {
     @Test("every added signal is labelled inside our namespace")
     func addedSignalsAreLabelledOurs() {
         for event in YabaiSignalEvent.allCases {
-            let argv = YabaiCommand.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks").argv
+            let argv = YabaiCommand.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks", socket: "/tmp/s.sock").argv
             let label = try? #require(argv.first { $0.hasPrefix("label=") })
             #expect(label?.hasPrefix("label=" + YabaiSignalEvent.labelPrefix) == true)
             #expect(argv.contains("event=" + event.rawValue))
@@ -106,13 +106,78 @@ struct CommandWhitelistTests {
 
     @Test("a signal action is our own executable and carries no other command")
     func signalActionIsOnlyOurBinary() {
-        let argv = YabaiCommand.addSignal(event: .windowCreated, notifying: "/opt/bin/yabai-stacks").argv
+        let argv = YabaiCommand.addSignal(
+            event: .windowCreated,
+            notifying: "/opt/bin/yabai-stacks",
+            socket: "/tmp/s.sock"
+        ).argv
         #expect(argv == [
             "signal", "--add",
             "event=window_created",
-            "action='/opt/bin/yabai-stacks' --notify",
+            "action='/opt/bin/yabai-stacks' --notify --socket '/tmp/s.sock'",
             "label=yabai-stacks.window_created",
         ])
+    }
+
+    /// yabai hands a signal action to a shell, so this quoting is the single
+    /// most load-bearing line for R4. Deleting the escaping used to leave the
+    /// whole suite green.
+    @Test("a hostile path cannot break out of the quoted action")
+    func shellQuotingContainsHostilePaths() {
+        let hostile = "/tmp/e'; rm -rf ~; echo '"
+        let quoted = ShellQuoting.singleQuoted(hostile)
+
+        // Reconstructing the original from the quoted form is the property that
+        // matters: what the shell parses back must be exactly the input.
+        #expect(Self.shellParse(quoted) == hostile)
+
+        #expect(quoted.hasPrefix("'"))
+        #expect(quoted.hasSuffix("'"))
+
+        // Every bare quote in the input becomes a closed-then-escaped sequence,
+        // so the quote count stays even and the string cannot end early.
+        #expect(quoted.filter { $0 == "'" }.count % 2 == 0)
+
+        for injection in ["`whoami`", "$(id)", "; reboot", "\n yabai -m space --destroy", "$HOME"] {
+            let safe = ShellQuoting.singleQuoted("/tmp/x" + injection)
+            #expect(safe.hasPrefix("'/tmp/x"))
+            #expect(safe.hasSuffix("'"))
+            #expect(safe.filter { $0 == "'" }.count % 2 == 0)
+        }
+    }
+
+    /// Mirrors how a POSIX shell reads a single-quoted word: everything is
+    /// literal until the next quote, and '\'' re-opens after an escaped one.
+    static func shellParse(_ quoted: String) -> String {
+        var out = ""
+        var inQuotes = false
+        var iterator = quoted.makeIterator()
+        var pending: Character?
+        while let character = pending ?? iterator.next() {
+            pending = nil
+            if character == "'" {
+                inQuotes.toggle()
+            } else if character == "\\", !inQuotes {
+                if let escaped = iterator.next() { out.append(escaped) }
+            } else {
+                out.append(character)
+            }
+        }
+        return out
+    }
+
+    @Test("a hostile socket path is quoted with the same rule")
+    func hostileSocketPathIsQuoted() {
+        let argv = YabaiCommand.addSignal(
+            event: .windowCreated,
+            notifying: "/opt/bin/yabai-stacks",
+            socket: "/tmp/s'; rm -rf ~; echo '.sock"
+        ).argv
+        let action = argv[3]
+
+        #expect(action.hasPrefix("action='/opt/bin/yabai-stacks' --notify --socket '"))
+        #expect(action.hasSuffix("'"))
+        #expect(action.filter { $0 == "'" }.count % 2 == 0)
     }
 
     @Test("signal commands never carry a layout-mutating domain")

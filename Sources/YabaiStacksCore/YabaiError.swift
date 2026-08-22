@@ -14,6 +14,7 @@ public enum YabaiError: Error, Hashable, Sendable {
     case timedOut
     case remoteFailure(String)
     case invalidWindowIdentifier(Int)
+    case argumentContainsDelimiter
     case decodingFailed(String)
 }
 
@@ -42,6 +43,8 @@ extension YabaiError: CustomStringConvertible {
             "yabai did not respond before the timeout elapsed"
         case .remoteFailure(let message):
             "yabai reported: \(message)"
+        case .argumentContainsDelimiter:
+            "a command argument contains a NUL, which is the argv delimiter"
         case .invalidWindowIdentifier(let id):
             "not a usable yabai window id: \(id)"
         case .decodingFailed(let detail):

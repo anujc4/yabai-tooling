@@ -35,7 +35,7 @@ public enum ConfigurationParser {
     public static let usage = """
     usage: yabai-stacks [options]
 
-      --icon-size <pt>              default 18
+      --icon-size <pt>              default 28
       --icon-spacing <pt>           default 4
       --padding <pt>                default 5
       --corner-radius <pt>          default 6
@@ -48,6 +48,7 @@ public enum ConfigurationParser {
       --offset-x <pt>               default 0
       --offset-y <pt>               default 0
       --min-stack-size <n>          default 2
+      --titlebar-inset <pt>         default 78
       --help
       --version
 
@@ -105,6 +106,8 @@ public enum ConfigurationParser {
                 configuration.offsetX = try number(flag, try nextValue(for: flag))
             case "--offset-y":
                 configuration.offsetY = try number(flag, try nextValue(for: flag))
+            case "--titlebar-inset":
+                configuration.titlebarInset = try number(flag, try nextValue(for: flag))
             case "--min-stack-size":
                 configuration.minStackSize = try integer(flag, try nextValue(for: flag))
             default:

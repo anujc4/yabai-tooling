@@ -10,7 +10,7 @@ public enum YabaiCommand: Hashable, Sendable {
     /// never where a window sits. The action is built from an executable path
     /// rather than taken as a string, and the label is derived from the event,
     /// so neither an arbitrary command nor another program's label is spellable.
-    case addSignal(event: YabaiSignalEvent, notifying: String)
+    case addSignal(event: YabaiSignalEvent, notifying: String, socket: String)
     case removeSignal(event: YabaiSignalEvent)
 
     var argv: [String] {
@@ -19,11 +19,15 @@ public enum YabaiCommand: Hashable, Sendable {
             return query.argv
         case .focusWindow(let id):
             return ["window", "--focus", String(id)]
-        case .addSignal(let event, let executable):
+        case .addSignal(let event, let executable, let socket):
+            // The socket path is resolved by the daemon and baked in: the child
+            // runs under yabai's environment, which may not carry USER or any
+            // override, and would otherwise derive a different path and deliver
+            // its wake-up nowhere.
             return [
                 "signal", "--add",
                 "event=\(event.rawValue)",
-                "action=\(ShellQuoting.singleQuoted(executable)) --notify",
+                "action=\(ShellQuoting.singleQuoted(executable)) --notify --socket \(ShellQuoting.singleQuoted(socket))",
                 "label=\(event.label)",
             ]
         case .removeSignal(let event):

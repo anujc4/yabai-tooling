@@ -144,8 +144,11 @@ public enum StripGeometry {
 
         let stripSize = size(iconCount: windowIDs.count, configuration: configuration)
         let stripSide = side(for: stackFrame, position: configuration.position, displayFrame: displayFrame)
+        // macOS puts the close/minimise/zoom buttons at the window's top-left,
+        // so only a left-anchored strip collides with them and only it is
+        // pushed clear. Anchoring right needs no inset.
         let originX = switch stripSide {
-        case .left: stackFrame.minX + configuration.offsetX
+        case .left: stackFrame.minX + configuration.offsetX + configuration.titlebarInset
         case .right: stackFrame.maxX - stripSize.width - configuration.offsetX
         }
         let anchored = Rect(

@@ -10,15 +10,17 @@ struct NotificationSocketTests {
 
     @Test("the default path is per-user and overridable")
     func defaultPath() {
-        #expect(NotificationSocket.defaultPath(environment: ["USER": "anuj"]) == "/tmp/yabai-stacks_anuj.socket")
-        #expect(NotificationSocket.defaultPath(environment: [:]) == "/tmp/yabai-stacks_unknown.socket")
+        #expect(NotificationSocket.defaultPath(environment: ["USER": "anuj"])
+            == NSTemporaryDirectory() + "yabai-stacks_anuj.socket")
+        #expect(NotificationSocket.defaultPath(environment: [:])
+            == NSTemporaryDirectory() + "yabai-stacks_unknown.socket")
         #expect(
             NotificationSocket.defaultPath(environment: ["YABAI_STACKS_SOCKET": "/tmp/custom.socket"])
                 == "/tmp/custom.socket"
         )
         #expect(
             NotificationSocket.defaultPath(environment: ["YABAI_STACKS_SOCKET": "", "USER": "anuj"])
-                == "/tmp/yabai-stacks_anuj.socket"
+                == NSTemporaryDirectory() + "yabai-stacks_anuj.socket"
         )
     }
 
@@ -28,7 +30,7 @@ struct NotificationSocketTests {
     func testPathsAreIsolated() {
         let path = temporaryPath()
         #expect(path.hasPrefix(NSTemporaryDirectory()))
-        #expect(!path.contains("/tmp/yabai_"))
+        #expect(!path.contains("/yabai_"))
     }
 
     @Test("a notify wakes a listening socket")

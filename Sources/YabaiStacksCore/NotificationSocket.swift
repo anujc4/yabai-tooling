@@ -16,8 +16,10 @@ public final class NotificationSocket: @unchecked Sendable {
 
     public static func defaultPath(environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
         if let override = environment["YABAI_STACKS_SOCKET"], !override.isEmpty { return override }
+        // NSTemporaryDirectory is per-user and mode 0700; /tmp is world
+        // writable, so another process could pre-create the path or connect.
         let user = environment["USER"] ?? "unknown"
-        return "/tmp/yabai-stacks_\(user).socket"
+        return NSTemporaryDirectory() + "yabai-stacks_\(user).socket"
     }
 
     /// Sends one wake-up and returns. Used by the `--notify` path, which must
@@ -40,6 +42,12 @@ public final class NotificationSocket: @unchecked Sendable {
 
         var byte: UInt8 = 1
         _ = send(fd, &byte, 1, 0)
+    }
+
+    /// True when something is already accepting on `path`. A stale file left by
+    /// a killed process refuses the connection and is safe to reclaim.
+    public static func isServed(path: String) -> Bool {
+        (try? notify(path: path, timeout: 0.25)) != nil
     }
 
     /// Calls `onEvent` once per connection, on a background thread. The caller
@@ -65,6 +73,9 @@ public final class NotificationSocket: @unchecked Sendable {
             close(fd)
             throw YabaiError.connectionFailed(path: path, code: errno)
         }
+        // bind() creates the filesystem node, and fchmod on the socket fd does
+        // not reach it on Darwin, so the path is chmod'ed directly.
+        _ = chmod(path, 0o600)
         guard Darwin.listen(fd, 32) == 0 else {
             close(fd)
             throw YabaiError.connectionFailed(path: path, code: errno)
@@ -86,8 +97,9 @@ public final class NotificationSocket: @unchecked Sendable {
                     if errno == EINTR { continue }
                     return
                 }
-                var scratch = [UInt8](repeating: 0, count: 8)
-                _ = recv(client, &scratch, scratch.count, 0)
+                // The connection itself is the wake-up. Reading first would let
+                // any peer that connects and stays silent block the only accept
+                // thread forever, leaving the daemon deaf at 0% CPU.
                 close(client)
                 onEvent()
             }

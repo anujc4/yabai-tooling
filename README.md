@@ -1,6 +1,6 @@
 # yabai-stacks
 
-Stack indicators for [yabai](https://github.com/asmvik/yabai). When a space
+Stack indicators for [yabai](https://github.com/koekeishiya/yabai). When a space
 contains stacked windows, a small strip of app icons appears at the corner of
 the stack showing every window in it, with the focused one highlighted. Click
 an icon to focus that window.
@@ -34,7 +34,8 @@ yabai-stacks --icon-size 32 --active-color 0xffd65d0e &
 
 That is the whole setup. `yabai-stacks` registers the yabai signals it needs at
 startup and removes them again when it exits — you do not add `signal --add`
-lines yourself.
+lines yourself. If it is killed outright, the stale signals are replaced on the
+next launch rather than accumulating.
 
 ### Options
 
@@ -53,6 +54,7 @@ lines yourself.
 | `--offset-x <pt>` | `0` | Nudge inwards from the anchored corner |
 | `--offset-y <pt>` | `0` | Nudge downwards |
 | `--min-stack-size <n>` | `2` | Smallest stack that gets a strip |
+| `--titlebar-inset <pt>` | `78` | Clearance for the window controls, left anchor only |
 | `--help`, `--version` | | |
 
 Colors accept `0xAARRGGBB`, `0xRRGGBB` and `#RRGGBB`.
@@ -62,10 +64,12 @@ its display's centre, in which case it goes on the right.
 
 ## Behaviour worth knowing
 
-**Your layout is never modified.** The only non-query command this program can
-send to yabai is `window --focus`. That is not a convention — the IPC layer
-accepts a `YabaiCommand` value whose `argv` is internal to the module, so no
-caller can spell an arbitrary command, and it is a compile error to try.
+**Your layout is never modified.** The only commands this program can send to
+yabai are read-only queries, `window --focus <id>`, and `signal --add`/`--remove`
+restricted to its own `yabai-stacks.` labels. None of those move a window. That
+is not a convention — the IPC layer accepts a `YabaiCommand` value whose `argv`
+is internal to the module, so no caller can spell an arbitrary command, and it
+is a compile error to try.
 
 **Your own yabai signals are safe.** `yabai-stacks` registers signals under the
 `yabai-stacks.` label prefix. Labels are derived from the event rather than

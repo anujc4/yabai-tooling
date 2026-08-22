@@ -19,7 +19,8 @@ struct StripOrientationTests {
             iconSpacing: iconSpacing,
             padding: padding,
             position: position,
-            orientation: orientation
+            orientation: orientation,
+            titlebarInset: 0
         )
     }
 
