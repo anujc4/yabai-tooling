@@ -10,7 +10,7 @@ struct StripClampingTests {
     private let display = Rect(x: 0, y: 0, width: 1800, height: 1169)
 
     private func configuration(position: StripPosition, iconSize: Double = 18) -> Configuration {
-        Configuration(iconSize: iconSize, iconSpacing: 4, padding: 5, position: position)
+        Configuration(iconSize: iconSize, iconSpacing: 4, padding: 5, position: position, orientation: .horizontal)
     }
 
     private func layout(

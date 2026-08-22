@@ -44,6 +44,7 @@ public enum ConfigurationParser {
       --inactive-opacity <0..1>     default 0.45
       --border-width <pt>           default 0
       --position auto|left|right    default auto
+      --orientation horizontal|vertical  default vertical
       --offset-x <pt>               default 0
       --offset-y <pt>               default 0
       --min-stack-size <n>          default 2
@@ -98,6 +99,8 @@ public enum ConfigurationParser {
                 configuration.borderWidth = try number(flag, try nextValue(for: flag))
             case "--position":
                 configuration.position = try position(flag, try nextValue(for: flag))
+            case "--orientation":
+                configuration.orientation = try orientation(flag, try nextValue(for: flag))
             case "--offset-x":
                 configuration.offsetX = try number(flag, try nextValue(for: flag))
             case "--offset-y":
@@ -139,6 +142,17 @@ public enum ConfigurationParser {
             )
         }
         return parsed
+    }
+
+    private static func orientation(_ flag: String, _ value: String) throws -> StripOrientation {
+        guard let orientation = StripOrientation(rawValue: value) else {
+            throw ConfigurationError.outOfRange(
+                flag: flag,
+                value: value,
+                expected: StripOrientation.allCases.map(\.rawValue).joined(separator: "|")
+            )
+        }
+        return orientation
     }
 
     private static func position(_ flag: String, _ value: String) throws -> StripPosition {

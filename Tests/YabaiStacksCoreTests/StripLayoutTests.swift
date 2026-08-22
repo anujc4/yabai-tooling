@@ -4,8 +4,8 @@ import Testing
 
 @Suite("Strip geometry")
 struct StripGeometryTests {
-    /// Defaults: icon 18, spacing 4, padding 5.
-    private let defaults = Configuration()
+    /// This suite pins horizontal placement; vertical has its own suite.
+    private let defaults = Configuration(iconSize: 18, orientation: .horizontal)
     private let stackFrame = Rect(x: 10, y: 50, width: 1780, height: 1079)
     private let displayFrame = Rect(x: 0, y: 0, width: 1800, height: 1169)
     private let ids = [732842, 783797, 783800, 783803]
@@ -41,6 +41,7 @@ struct StripGeometryTests {
             iconSpacing: iconSpacing,
             padding: padding,
             position: position,
+            orientation: .horizontal,
             offsetX: offsetX,
             offsetY: offsetY
         )
@@ -426,7 +427,7 @@ struct StripGeometryTests {
         let stack = try #require(
             StackDetector().detect(windows: windows, spaces: [Synthetic.space(2, hasFocus: true)]).first
         )
-        let strip = try #require(StripGeometry.layout(stack: stack, displays: displays, configuration: Configuration()))
+        let strip = try #require(StripGeometry.layout(stack: stack, displays: displays, configuration: defaults))
 
         // The stack spans the display, so its centre ties and auto goes left.
         #expect(strip.side == .left)

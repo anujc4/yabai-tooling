@@ -18,7 +18,7 @@ struct ConfigurationParserTests {
     func defaults() throws {
         let configuration = try self.configuration([])
 
-        #expect(configuration.iconSize == 18)
+        #expect(configuration.iconSize == 28)
         #expect(configuration.iconSpacing == 4)
         #expect(configuration.padding == 5)
         #expect(configuration.cornerRadius == 6)
@@ -27,6 +27,7 @@ struct ConfigurationParserTests {
         #expect(configuration.inactiveOpacity == 0.45)
         #expect(configuration.borderWidth == 0)
         #expect(configuration.position == .auto)
+        #expect(configuration.orientation == .vertical)
         #expect(configuration.offsetX == 0)
         #expect(configuration.offsetY == 0)
         #expect(configuration.minStackSize == 2)

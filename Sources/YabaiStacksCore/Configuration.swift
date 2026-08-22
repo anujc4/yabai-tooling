@@ -4,6 +4,13 @@ public enum StripPosition: String, Hashable, Sendable, CaseIterable {
     case right
 }
 
+/// Icons run left-to-right or top-to-bottom. Vertical keeps a wide stack's
+/// strip out of the window's own titlebar area.
+public enum StripOrientation: String, Hashable, Sendable, CaseIterable {
+    case horizontal
+    case vertical
+}
+
 public struct Configuration: Hashable, Sendable {
     public var iconSize: Double
     public var iconSpacing: Double
@@ -14,12 +21,13 @@ public struct Configuration: Hashable, Sendable {
     public var inactiveOpacity: Double
     public var borderWidth: Double
     public var position: StripPosition
+    public var orientation: StripOrientation
     public var offsetX: Double
     public var offsetY: Double
     public var minStackSize: Int
 
     public init(
-        iconSize: Double = 18,
+        iconSize: Double = 28,
         iconSpacing: Double = 4,
         padding: Double = 5,
         cornerRadius: Double = 6,
@@ -28,6 +36,7 @@ public struct Configuration: Hashable, Sendable {
         inactiveOpacity: Double = 0.45,
         borderWidth: Double = 0,
         position: StripPosition = .auto,
+        orientation: StripOrientation = .vertical,
         offsetX: Double = 0,
         offsetY: Double = 0,
         minStackSize: Int = 2
@@ -41,6 +50,7 @@ public struct Configuration: Hashable, Sendable {
         self.inactiveOpacity = inactiveOpacity
         self.borderWidth = borderWidth
         self.position = position
+        self.orientation = orientation
         self.offsetX = offsetX
         self.offsetY = offsetY
         self.minStackSize = minStackSize

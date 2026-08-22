@@ -76,12 +76,14 @@ public struct StripLayout: Hashable, Sendable {
 public enum StripGeometry {
     public static func size(iconCount: Int, configuration: Configuration) -> Size {
         let count = Double(max(0, iconCount))
-        return Size(
-            width: configuration.padding * 2
-                + count * configuration.iconSize
-                + max(0, count - 1) * configuration.iconSpacing,
-            height: configuration.padding * 2 + configuration.iconSize
-        )
+        let along = configuration.padding * 2
+            + count * configuration.iconSize
+            + max(0, count - 1) * configuration.iconSpacing
+        let across = configuration.padding * 2 + configuration.iconSize
+        return switch configuration.orientation {
+        case .horizontal: Size(width: along, height: across)
+        case .vertical: Size(width: across, height: along)
+        }
     }
 
     /// `.auto` goes right only when the stack's horizontal centre is strictly
@@ -152,14 +154,27 @@ public enum StripGeometry {
         )
         let frame = displayFrame.map { clamped(anchored, to: $0) } ?? anchored
 
+        // Laid out in yabai's top-left-origin space, so index 0 sits at the
+        // smallest y and stays the topmost icon after the flip to AppKit.
         let step = configuration.iconSize + configuration.iconSpacing
         let icons = windowIDs.indices.map { index in
-            Rect(
-                x: frame.minX + configuration.padding + Double(index) * step,
-                y: frame.minY + configuration.padding,
-                width: configuration.iconSize,
-                height: configuration.iconSize
-            )
+            let advance = Double(index) * step
+            return switch configuration.orientation {
+            case .horizontal:
+                Rect(
+                    x: frame.minX + configuration.padding + advance,
+                    y: frame.minY + configuration.padding,
+                    width: configuration.iconSize,
+                    height: configuration.iconSize
+                )
+            case .vertical:
+                Rect(
+                    x: frame.minX + configuration.padding,
+                    y: frame.minY + configuration.padding + advance,
+                    width: configuration.iconSize,
+                    height: configuration.iconSize
+                )
+            }
         }
 
         return StripLayout(
