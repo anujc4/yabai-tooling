@@ -11,15 +11,15 @@ struct CommandWhitelistTests {
     /// flags `--space` / `--display` are deliberately not the same tokens as the
     /// `space` / `display` domains that would move things around.
     static let forbiddenTokens: Set<String> = [
-        "space", "display", "config", "rule", "signal",
+        "space", "display", "config", "rule",
         "--swap", "--warp", "--stack", "--toggle", "--resize", "--move",
         "--insert", "--balance", "--ratio", "--grid", "--layout", "--create",
         "--destroy", "--label", "--mirror", "--rotate", "--flip", "--gap",
         "--padding", "--close", "--minimize", "--deminimize", "--sub-layer",
-        "--opacity", "--scratchpad", "--add", "--remove",
+        "--opacity", "--scratchpad",
     ]
 
-    static let allowedFirstTokens: Set<String> = ["query", "window"]
+    static let allowedFirstTokens: Set<String> = ["query", "window", "signal"]
     static let allowedQueryDomains: Set<String> = ["--windows", "--spaces", "--displays"]
     static let allowedQueryScopeFlags: Set<String> = ["--space", "--display"]
 
@@ -51,22 +51,78 @@ struct CommandWhitelistTests {
 
         var commands: [YabaiCommand] = queries.map(YabaiCommand.query)
         commands.append(contentsOf: [.focusWindow(id: 0), .focusWindow(id: 577003), .focusWindow(id: -1)])
+
+        for event in YabaiSignalEvent.allCases {
+            commands.append(.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks"))
+            commands.append(.removeSignal(event: event))
+        }
         for command in commands {
             switch command {
-            case .query, .focusWindow: break
+            case .query, .focusWindow, .addSignal, .removeSignal: break
             }
         }
         return commands
     }
 
-    @Test("the whole surface is 12 commands: 9 query shapes plus focus")
+    @Test("the surface is 9 query shapes, focus, and one signal pair per event")
     func surfaceSize() {
         let queries = Self.everyCommand.filter { if case .query = $0 { true } else { false } }
         let focuses = Self.everyCommand.filter { if case .focusWindow = $0 { true } else { false } }
+        let signals = Self.everyCommand.filter { $0.argv.first == "signal" }
 
         #expect(queries.count == 9)
         #expect(focuses.count == 3)
         #expect(Set(queries.map(\.argv)).count == 9)
+        #expect(signals.count == YabaiSignalEvent.allCases.count * 2)
+    }
+
+    /// The user keeps their own signals in yabairc. A label this program can
+    /// spell is a label it could remove, so every label it emits is derived
+    /// from our prefix and no API accepts one as an argument.
+    @Test("removing a signal can only ever target our own namespace")
+    func signalRemovalCannotTouchUserSignals() {
+        for event in YabaiSignalEvent.allCases {
+            let argv = YabaiCommand.removeSignal(event: event).argv
+            #expect(argv.count == 3)
+            #expect(argv[0] == "signal")
+            #expect(argv[1] == "--remove")
+            #expect(argv[2].hasPrefix(YabaiSignalEvent.labelPrefix))
+        }
+        #expect(
+            YabaiCommand.removeSignal(event: .windowCreated).argv
+                == ["signal", "--remove", "yabai-stacks.window_created"]
+        )
+    }
+
+    @Test("every added signal is labelled inside our namespace")
+    func addedSignalsAreLabelledOurs() {
+        for event in YabaiSignalEvent.allCases {
+            let argv = YabaiCommand.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks").argv
+            let label = try? #require(argv.first { $0.hasPrefix("label=") })
+            #expect(label?.hasPrefix("label=" + YabaiSignalEvent.labelPrefix) == true)
+            #expect(argv.contains("event=" + event.rawValue))
+        }
+    }
+
+    @Test("a signal action is our own executable and carries no other command")
+    func signalActionIsOnlyOurBinary() {
+        let argv = YabaiCommand.addSignal(event: .windowCreated, notifying: "/opt/bin/yabai-stacks").argv
+        #expect(argv == [
+            "signal", "--add",
+            "event=window_created",
+            "action='/opt/bin/yabai-stacks' --notify",
+            "label=yabai-stacks.window_created",
+        ])
+    }
+
+    @Test("signal commands never carry a layout-mutating domain")
+    func signalCommandsAreNotLayout() {
+        for command in Self.everyCommand where command.argv.first == "signal" {
+            #expect(!command.argv.contains("window"))
+            #expect(!command.argv.contains("--focus"))
+            let offending = Set(command.argv).intersection(Self.forbiddenTokens)
+            #expect(offending.isEmpty, "\(command.argv) contains \(offending)")
+        }
     }
 
     @Test("no command contains a layout-mutating or configuration token")
@@ -120,7 +176,7 @@ struct CommandWhitelistTests {
         }
     }
 
-    @Test("the exhaustive argv set equals the expected whitelist")
+    @Test("the exhaustive query and focus argv set equals the expected whitelist")
     func exactArgvWhitelist() {
         let expected: Set<[String]> = [
             ["query", "--windows"],
@@ -136,7 +192,10 @@ struct CommandWhitelistTests {
             ["window", "--focus", "577003"],
             ["window", "--focus", "-1"],
         ]
-        #expect(Set(Self.everyCommand.map(\.argv)) == expected)
+        // Signal commands are audited separately: they are parameterised by
+        // event, so pinning them here would restate YabaiSignalEvent.allCases.
+        let subject = Self.everyCommand.map(\.argv).filter { $0.first != "signal" }
+        #expect(Set(subject) == expected)
     }
 
     @Test("the client only ever emits whitelisted argv")

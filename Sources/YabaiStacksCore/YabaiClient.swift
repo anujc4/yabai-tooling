@@ -26,6 +26,16 @@ public struct YabaiClient: Sendable {
         _ = try transport.send(.focusWindow(id: id))
     }
 
+    public func addSignal(_ event: YabaiSignalEvent, notifying executable: String) throws {
+        _ = try transport.send(.addSignal(event: event, notifying: executable))
+    }
+
+    /// Removing a signal we never added is not an error worth failing over:
+    /// cleanup runs on a signal handler and must be idempotent.
+    public func removeSignal(_ event: YabaiSignalEvent) {
+        _ = try? transport.send(.removeSignal(event: event))
+    }
+
     private func query<Element: Decodable>(_ query: YabaiQuery) throws -> [Element] {
         let data = try transport.send(.query(query))
         do {

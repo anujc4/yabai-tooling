@@ -6,12 +6,28 @@ public enum YabaiCommand: Hashable, Sendable {
     case query(YabaiQuery)
     case focusWindow(id: Int)
 
+    /// Signals are not layout: adding one changes what yabai notifies us about,
+    /// never where a window sits. The action is built from an executable path
+    /// rather than taken as a string, and the label is derived from the event,
+    /// so neither an arbitrary command nor another program's label is spellable.
+    case addSignal(event: YabaiSignalEvent, notifying: String)
+    case removeSignal(event: YabaiSignalEvent)
+
     var argv: [String] {
         switch self {
         case .query(let query):
             return query.argv
         case .focusWindow(let id):
             return ["window", "--focus", String(id)]
+        case .addSignal(let event, let executable):
+            return [
+                "signal", "--add",
+                "event=\(event.rawValue)",
+                "action=\(ShellQuoting.singleQuoted(executable)) --notify",
+                "label=\(event.label)",
+            ]
+        case .removeSignal(let event):
+            return ["signal", "--remove", event.label]
         }
     }
 }
