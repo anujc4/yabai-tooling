@@ -102,11 +102,35 @@ public enum StripGeometry {
         }
     }
 
+    /// Slid — never resized — until it lies inside `bounds` on both axes. When
+    /// the strip is longer than the display on an axis it cannot fit at all, and
+    /// the low edge wins: the overflow is left hanging off the high edge rather
+    /// than the origin being pushed past the low edge, which would hide the
+    /// strip's start and invert the two clamps against each other.
+    public static func clamped(_ rect: Rect, to bounds: Rect) -> Rect {
+        Rect(
+            x: clampedOrigin(rect.minX, length: rect.width, low: bounds.minX, high: bounds.maxX),
+            y: clampedOrigin(rect.minY, length: rect.height, low: bounds.minY, high: bounds.maxY),
+            width: rect.width,
+            height: rect.height
+        )
+    }
+
+    private static func clampedOrigin(_ origin: Double, length: Double, low: Double, high: Double) -> Double {
+        max(low, min(origin, high - length))
+    }
+
     /// Offsets push the strip away from the corner it is anchored to: a
     /// positive `--offset-x` moves a left-anchored strip right and a
     /// right-anchored strip left, so the same value nudges either side inwards.
     /// A positive `--offset-y` always moves down, matching yabai's top-left
     /// origin and the strip's top anchoring.
+    ///
+    /// The result is clamped to the **display**, not to the stack frame: a
+    /// narrow leaf carrying many icons has no placement that both fits and
+    /// labels only its own frame, and a strip drawn off-display labels nothing
+    /// at all. Overflowing a neighbouring stack is the lesser evil, so
+    /// overflowing the stack frame stays legal.
     public static func layout(
         stackFrame: Rect,
         windowIDs: [Int],
@@ -122,10 +146,11 @@ public enum StripGeometry {
         case .left: stackFrame.minX + configuration.offsetX
         case .right: stackFrame.maxX - stripSize.width - configuration.offsetX
         }
-        let frame = Rect(
+        let anchored = Rect(
             origin: Point(x: originX, y: stackFrame.minY + configuration.offsetY),
             size: stripSize
         )
+        let frame = displayFrame.map { clamped(anchored, to: $0) } ?? anchored
 
         let step = configuration.iconSize + configuration.iconSpacing
         let icons = windowIDs.indices.map { index in

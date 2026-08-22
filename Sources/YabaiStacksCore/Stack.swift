@@ -41,6 +41,22 @@ public struct FrameKey: Hashable, Sendable {
     }
 }
 
+/// Ordered on the quantised key rather than on the raw frame, so the ordering
+/// stays a strict weak ordering even for a NaN-bearing frame. Exists so a
+/// reconciliation diff can report keys in a stable order without the caller
+/// having kept the stacks they came from.
+extension FrameKey: Comparable {
+    public static func < (lhs: FrameKey, rhs: FrameKey) -> Bool {
+        (lhs.y, lhs.x, lhs.w, lhs.h) < (rhs.y, rhs.x, rhs.w, rhs.h)
+    }
+}
+
+extension StackKey: Comparable {
+    public static func < (lhs: StackKey, rhs: StackKey) -> Bool {
+        (lhs.space, lhs.frame) < (rhs.space, rhs.frame)
+    }
+}
+
 /// One detected stack on a visible space. `Equatable` so M4 can diff two
 /// refreshes; `activeWindowID` is optional because a stack whose space is not
 /// the focused one legitimately has no active member (SPEC 5).
