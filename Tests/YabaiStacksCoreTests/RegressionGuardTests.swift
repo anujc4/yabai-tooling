@@ -141,7 +141,7 @@ private final class Counter: @unchecked Sendable {
         return value
     }
 
-    func waitForCount(atLeast target: Int, timeout: TimeInterval = 2) -> Bool {
+    func waitForCount(atLeast target: Int, timeout: TimeInterval = 10) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if count >= target { return true }

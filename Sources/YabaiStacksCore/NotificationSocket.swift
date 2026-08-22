@@ -47,7 +47,7 @@ public final class NotificationSocket: @unchecked Sendable {
     /// True when something is already accepting on `path`. A stale file left by
     /// a killed process refuses the connection and is safe to reclaim.
     public static func isServed(path: String) -> Bool {
-        (try? notify(path: path, timeout: 0.25)) != nil
+        (try? notify(path: path, timeout: 1)) != nil
     }
 
     /// Calls `onEvent` once per connection, on a background thread. The caller
