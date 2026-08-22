@@ -8,7 +8,10 @@ TESTING_FRAMEWORKS := /Library/Developer/CommandLineTools/Library/Developer/Fram
 TEST_FLAGS := $(if $(wildcard $(TESTING_FRAMEWORKS)/Testing.framework),-Xswiftc -F -Xswiftc $(TESTING_FRAMEWORKS),)
 TEST_LOG := .build/last-test-run.log
 
-.PHONY: all build release run test clean
+PREFIX ?= /usr/local
+BINDIR := $(PREFIX)/bin
+
+.PHONY: all build release run test install uninstall clean
 
 all: build
 
@@ -35,6 +38,14 @@ test:
 	count=$$(echo "$$summary" | sed -E 's/.*Test run with ([0-9]+) test.*/\1/'); \
 	if [ "$$count" -lt 1 ]; then echo "FAILED: zero tests executed."; exit 1; fi; \
 	echo "OK: $$count tests executed."
+
+install: release
+	@mkdir -p $(BINDIR)
+	install -m 755 .build/release/yabai-stacks $(BINDIR)/yabai-stacks
+	@echo "installed $(BINDIR)/yabai-stacks"
+
+uninstall:
+	rm -f $(BINDIR)/yabai-stacks
 
 clean:
 	$(SWIFT) package clean
