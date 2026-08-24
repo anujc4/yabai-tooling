@@ -20,7 +20,10 @@ func value(after flag: String) -> String? {
 // socket path is passed in rather than re-derived: this runs under yabai's
 // environment, which need not carry USER or any override the daemon saw.
 if arguments.contains("--notify") {
-    try? NotificationSocket.notify(path: value(after: "--socket") ?? NotificationSocket.defaultPath())
+    try? NotificationSocket.notify(
+        path: value(after: "--socket") ?? NotificationSocket.defaultPath(),
+        event: value(after: "--event")
+    )
     exit(0)
 }
 
@@ -69,14 +72,27 @@ let executable = ExecutablePath.resolved(argv0: CommandLine.arguments.first)
 nonisolated(unsafe) var registered = false
 nonisolated(unsafe) var tornDown = false
 
+/// A failure here is not cosmetic: the event whose signal did not register is
+/// an event the daemon will never hear about, and a yabai too old for one of
+/// them would silently lose that feature. Failures are reported and leave
+/// `registered` false, so the next successful refresh tries the whole table
+/// again.
 func register() {
+    var failures: [String] = []
     for event in YabaiSignalEvent.allCases {
         // Replace rather than accumulate: a run killed with SIGKILL leaves its
         // signals behind, and yabai will happily hold two under one label.
         client.removeSignal(event)
-        try? client.addSignal(event, notifying: executable, socket: socketPath)
+        do {
+            try client.addSignal(event, notifying: executable, socket: socketPath)
+        } catch {
+            failures.append("\(event.rawValue): \(error)")
+        }
     }
-    registered = true
+    for failure in failures {
+        FileHandle.standardError.write(Data("yabai-stacks: could not register signal \(failure)\n".utf8))
+    }
+    registered = failures.isEmpty
 }
 
 func teardown() {
@@ -123,7 +139,19 @@ func scheduleRefresh() {
 }
 
 do {
-    try socket.listen { DispatchQueue.main.async { scheduleRefresh() } }
+    try socket.listen { name in
+        // The decision itself lives in Core, where it can be tested; this
+        // target has none. Mission Control does not change the stacks, only
+        // whether they should be on screen, so it skips the re-query entirely.
+        let action = WakeAction.action(for: name)
+        DispatchQueue.main.async {
+            switch action {
+            case .hide: controller.setHidden(true, animated: true)
+            case .show: controller.setHidden(false, animated: true)
+            case .refresh: scheduleRefresh()
+            }
+        }
+    }
 } catch {
     fail("could not open notification socket at \(socketPath): \(error)")
 }
@@ -150,38 +178,7 @@ workspace.addObserver(
     object: nil,
     queue: .main
 ) { _ in
-    MainActor.assumeIsolated {
-        controller.setHidden(false, animated: true)
-        scheduleRefresh()
-    }
-}
-
-// Mission Control has no public API. The Dock takes over the screen for its
-// duration, so its activation is the closest observable proxy; the overlays
-// slide away while it is up and return when the Dock resigns.
-workspace.addObserver(
-    forName: NSWorkspace.didActivateApplicationNotification,
-    object: nil,
-    queue: .main
-) { note in
-    guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-          app.bundleIdentifier == "com.apple.dock"
-    else { return }
-    MainActor.assumeIsolated { controller.setHidden(true, animated: true) }
-}
-
-workspace.addObserver(
-    forName: NSWorkspace.didDeactivateApplicationNotification,
-    object: nil,
-    queue: .main
-) { note in
-    guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-          app.bundleIdentifier == "com.apple.dock"
-    else { return }
-    MainActor.assumeIsolated {
-        controller.setHidden(false, animated: true)
-        scheduleRefresh()
-    }
+    MainActor.assumeIsolated { scheduleRefresh() }
 }
 
 refresh()

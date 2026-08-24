@@ -137,7 +137,11 @@ final class StripPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = false
         isMovable = false
-        ignoresMouseEvents = false
+        // Under --hide-on-hover the panel is out of the mouse path entirely, so
+        // a click can never be swallowed by a strip that has not finished
+        // getting out of the way. Hover is detected from cursor position, which
+        // needs no events delivered here.
+        ignoresMouseEvents = configuration.hideOnHover
         hidesOnDeactivate = false
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)))
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
@@ -166,9 +170,11 @@ final class StripPanel: NSPanel {
         }
     }
 
-    func apply(render: StripRender, icons: AppIconProvider, primaryDisplayHeight: Double) {
-        setFrame(Self.screenRect(for: render, primaryDisplayHeight: primaryDisplayHeight), display: false)
-        stripView.frame = NSRect(origin: .zero, size: frame.size)
+    /// The frame is supplied rather than derived: a strip that is currently
+    /// parked out of the way must stay parked across a refresh.
+    func apply(render: StripRender, icons: AppIconProvider, screenFrame: NSRect) {
+        setFrame(screenFrame, display: false)
+        stripView.frame = NSRect(origin: .zero, size: screenFrame.size)
         stripView.apply(render: render, icons: icons)
     }
 

@@ -1,0 +1,25 @@
+/// Which strips the cursor is over, for `--hide-on-hover`. Judged against each
+/// strip's home rect — where it sits when shown, never where it currently is —
+/// for the reason recorded in docs/SPEC.md § Hard constraints.
+public enum HoverGate {
+    /// Entering is judged on the exact home rect and leaving on the same rect
+    /// grown by this much, so a cursor on the boundary settles.
+    public static let exitMargin: Double = 2
+
+    public static func hidden<Key: Hashable>(
+        cursor: Point?,
+        homes: [Key: Rect],
+        previouslyHidden: Set<Key>,
+        margin: Double = exitMargin
+    ) -> Set<Key> {
+        guard let cursor else { return [] }
+        return Set(
+            homes
+                .filter { key, home in
+                    let grow = previouslyHidden.contains(key) ? -margin : 0
+                    return home.insetBy(dx: grow, dy: grow).contains(cursor)
+                }
+                .keys
+        )
+    }
+}

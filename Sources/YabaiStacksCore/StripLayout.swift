@@ -122,6 +122,40 @@ public enum StripGeometry {
         max(low, min(origin, high - length))
     }
 
+    /// The whole desktop as one rect. Parking is measured against this rather
+    /// than against the strip's own screen: on a multi-display setup the near
+    /// edge of one screen is an interior edge of the desktop, and a strip sent
+    /// past it lands fully visible on the neighbour — where Mission Control is
+    /// also drawing.
+    public static func desktop(of screens: [Rect]) -> Rect? {
+        guard let first = screens.first else { return nil }
+        let bounds = screens.dropFirst().reduce(first) { union, screen in
+            Rect(
+                x: min(union.minX, screen.minX),
+                y: min(union.minY, screen.minY),
+                width: max(union.maxX, screen.maxX) - min(union.minX, screen.minX),
+                height: max(union.maxY, screen.maxY) - min(union.minY, screen.minY)
+            )
+        }
+        return bounds
+    }
+
+    /// Where a strip waits while it is out of the way: past the nearer
+    /// horizontal edge of the whole desktop, so it exits the way it came in and
+    /// is off every display rather than merely off its own. `margin` carries it
+    /// clear of the edge rather than flush against it. A strip centred exactly
+    /// on the desktop's centre has no nearer edge and leaves left, the same
+    /// tie-break `.auto` placement uses. With no desktop there is no edge to
+    /// aim for and twice its own width is far enough.
+    public static let parkingMargin: Double = 8
+
+    public static func parked(_ rect: Rect, beyond desktop: Rect?, margin: Double = parkingMargin) -> Rect {
+        guard let desktop else { return rect.offsetBy(dx: -rect.width * 2, dy: 0) }
+        let exitsLeft = rect.midX <= desktop.midX
+        let dx = exitsLeft ? desktop.minX - rect.maxX - margin : desktop.maxX - rect.minX + margin
+        return rect.offsetBy(dx: dx, dy: 0)
+    }
+
     /// Offsets push the strip away from the corner it is anchored to: a
     /// positive `--offset-x` moves a left-anchored strip right and a
     /// right-anchored strip left, so the same value nudges either side inwards.

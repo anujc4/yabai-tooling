@@ -81,7 +81,7 @@ struct RegressionGuardTests {
         let path = NSTemporaryDirectory() + "yabai-stacks-inert-\(UInt32.random(in: 0..<UInt32.max)).socket"
         let socket = NotificationSocket(path: path)
         let counter = Counter()
-        try socket.listen { counter.increment() }
+        try socket.listen { _ in counter.increment() }
 
         try NotificationSocket.notify(path: path)
         #expect(counter.waitForCount(atLeast: 1))
@@ -102,11 +102,48 @@ struct RegressionGuardTests {
         #expect(!NotificationSocket.isServed(path: path))
 
         let socket = NotificationSocket(path: path)
-        try socket.listen {}
+        try socket.listen { _ in }
         #expect(NotificationSocket.isServed(path: path))
 
         socket.stop()
         #expect(!NotificationSocket.isServed(path: path))
+    }
+
+    /// The daemon routes on the event name that arrived down the socket, so the
+    /// name it registered and the name it decodes have to be the same string.
+    /// Only the two Mission Control names may take a hide path; everything
+    /// else — including a name a future yabai adds, and a wake-up carrying no
+    /// name at all — must fall through to a refresh rather than be dropped.
+    ///
+    /// This lives in Core because the executable target has no tests: while the
+    /// same switch sat in `main.swift`, swapping enter for exit left the whole
+    /// suite green.
+    @Test("only the Mission Control names take a hide path")
+    func eventRouting() {
+        #expect(WakeAction.action(for: "mission_control_enter") == .hide)
+        #expect(WakeAction.action(for: "mission_control_exit") == .show)
+
+        for event in YabaiSignalEvent.allCases {
+            #expect(YabaiSignalEvent(rawValue: event.rawValue) == event)
+            #expect(event.isMissionControl == [.missionControlEnter, .missionControlExit].contains(event))
+
+            let expected: WakeAction = switch event {
+            case .missionControlEnter: .hide
+            case .missionControlExit: .show
+            default: .refresh
+            }
+            #expect(WakeAction.action(for: event.rawValue) == expected, "\(event.rawValue)")
+        }
+        #expect(YabaiSignalEvent.allCases.filter(\.isMissionControl).count == 2)
+        #expect(YabaiSignalEvent.allCases.filter { WakeAction.action(for: $0.rawValue) == .refresh }.count == 12)
+
+        // Anything the daemon cannot name still repaints.
+        #expect(WakeAction.action(for: nil) == .refresh)
+        for unknown in ["", "window_created ", "MISSION_CONTROL_ENTER", "mission_control", "window_swapped"] {
+            #expect(YabaiSignalEvent(rawValue: unknown) == nil, "accepted '\(unknown)'")
+            #expect(WakeAction.action(for: unknown) == .refresh, "routed '\(unknown)' away from a refresh")
+        }
+        #expect(Set(WakeAction.allCases) == [.refresh, .hide, .show])
     }
 
     /// NUL is the argv delimiter, so an element carrying one would arrive as

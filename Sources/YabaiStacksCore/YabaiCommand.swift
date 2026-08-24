@@ -27,7 +27,7 @@ public enum YabaiCommand: Hashable, Sendable {
             return [
                 "signal", "--add",
                 "event=\(event.rawValue)",
-                "action=\(ShellQuoting.singleQuoted(executable)) --notify --socket \(ShellQuoting.singleQuoted(socket))",
+                "action=\(ShellQuoting.singleQuoted(executable)) --notify --socket \(ShellQuoting.singleQuoted(socket)) --event \(event.rawValue)",
                 "label=\(event.label)",
             ]
         case .removeSignal(let event):

@@ -27,6 +27,11 @@ public struct Configuration: Hashable, Sendable {
     public var minStackSize: Int
     public var titlebarInset: Double
 
+    /// The strip gets out of the way while the cursor is over it, and registers
+    /// no click actions at all: hiding is the whole interaction, so an icon
+    /// that could be clicked would only ever be clicked by accident.
+    public var hideOnHover: Bool
+
     public init(
         iconSize: Double = 28,
         iconSpacing: Double = 4,
@@ -41,7 +46,8 @@ public struct Configuration: Hashable, Sendable {
         offsetX: Double = 0,
         offsetY: Double = 0,
         minStackSize: Int = 2,
-        titlebarInset: Double = 78
+        titlebarInset: Double = 78,
+        hideOnHover: Bool = false
     ) {
         self.iconSize = iconSize
         self.iconSpacing = iconSpacing
@@ -57,6 +63,7 @@ public struct Configuration: Hashable, Sendable {
         self.offsetY = offsetY
         self.minStackSize = minStackSize
         self.titlebarInset = titlebarInset
+        self.hideOnHover = hideOnHover
     }
 
     /// Only `--icon-size` must be strictly positive; a zero gap, corner radius

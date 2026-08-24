@@ -15,6 +15,14 @@ public enum YabaiSignalEvent: String, Hashable, Sendable, CaseIterable {
     case windowDeminimized = "window_deminimized"
     case spaceChanged = "space_changed"
     case displayChanged = "display_changed"
+    case missionControlEnter = "mission_control_enter"
+    case missionControlExit = "mission_control_exit"
+
+    /// Mission Control is the one thing yabai reports that is not a reason to
+    /// re-query: the stacks have not changed, only their visibility should.
+    public var isMissionControl: Bool {
+        self == .missionControlEnter || self == .missionControlExit
+    }
 
     public static let labelPrefix = "yabai-stacks."
 
@@ -22,6 +30,26 @@ public enum YabaiSignalEvent: String, Hashable, Sendable, CaseIterable {
     /// same table, so a label this program can spell is a label it could later
     /// remove; deriving every one of them makes that impossible.
     public var label: String { "\(Self.labelPrefix)\(rawValue)" }
+}
+
+/// What a wake-up down the notification socket means. It lives in Core rather
+/// than in the daemon because the executable target has no tests: the routing
+/// mutated freely while the suite stayed green as long as it was a `switch` in
+/// `main.swift`.
+public enum WakeAction: Hashable, Sendable, CaseIterable {
+    case refresh
+    case hide
+    case show
+
+    /// An unknown or absent name refreshes rather than being dropped: a wake-up
+    /// carries no promise of a name, and a yabai that adds an event must not
+    /// silently stop repainting.
+    public static func action(for name: String?) -> WakeAction {
+        guard let event = name.flatMap(YabaiSignalEvent.init(rawValue:)), event.isMissionControl else {
+            return .refresh
+        }
+        return event == .missionControlEnter ? .hide : .show
+    }
 }
 
 public enum ExecutablePath {
@@ -33,7 +61,7 @@ public enum ExecutablePath {
         var size = UInt32(4096)
         var buffer = [CChar](repeating: 0, count: Int(size))
         if _NSGetExecutablePath(&buffer, &size) == 0 {
-            let path = String(cString: buffer)
+            let path = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             if !path.isEmpty {
                 return URL(fileURLWithPath: path).standardizedFileURL.path
             }

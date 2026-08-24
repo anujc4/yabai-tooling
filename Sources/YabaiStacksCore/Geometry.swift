@@ -63,6 +63,18 @@ public struct Rect: Hashable, Sendable {
     public func offsetBy(dx: Double, dy: Double) -> Rect {
         Rect(x: x + dx, y: y + dy, width: width, height: height)
     }
+
+    /// Positive insets shrink, negative ones grow. A shrink deeper than half an
+    /// edge would flip that edge past the other, so the size floors at zero and
+    /// the rect collapses onto its own centre instead.
+    public func insetBy(dx: Double, dy: Double) -> Rect {
+        Rect(
+            x: x + min(dx, width / 2),
+            y: y + min(dy, height / 2),
+            width: max(0, width - dx * 2),
+            height: max(0, height - dy * 2)
+        )
+    }
 }
 
 /// yabai reports frames in top-left-origin global coordinates; AppKit puts the

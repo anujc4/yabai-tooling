@@ -55,6 +55,7 @@ next launch rather than accumulating.
 | `--offset-y <pt>` | `0` | Nudge downwards |
 | `--min-stack-size <n>` | `2` | Smallest stack that gets a strip |
 | `--titlebar-inset <pt>` | `78` | Clearance for the window controls, left anchor only |
+| `--hide-on-hover` | off | Strip slides away under the cursor instead of taking clicks |
 | `--help`, `--version` | | |
 
 Colors accept `0xAARRGGBB`, `0xRRGGBB` and `#RRGGBB`.
@@ -83,6 +84,25 @@ stack on a visible but unfocused display legitimately has no highlighted icon.
 **Nothing polls.** The daemon blocks waiting for yabai to fire a signal.
 Refreshes coalesce over 40ms, because one user action typically emits several
 signals in a burst.
+
+**Mission Control gets the screen to itself.** yabai emits
+`mission_control_enter` and `mission_control_exit`, so the strips slide off
+their display edge while it is open and slide back afterwards. No polling and no
+private API is involved, and a refresh landing in the middle keeps them parked.
+
+**`--hide-on-hover` trades the click for the view.** By default the strip stays
+put and clicking an icon focuses that window. With `--hide-on-hover` the strip
+slides away while the cursor is over it and returns when the cursor leaves —
+and it registers no click action at all, so clicks go to the window underneath
+exactly as if the strip were not there. The two behaviours are exclusive: the
+strip cannot both get out of the cursor's way and be clickable.
+
+Hover is decided from the cursor position against where the strip *belongs*,
+not where it currently is; a strip that has moved out of the way is never under
+the cursor, and testing its live frame would bring it straight back. Detection
+uses a mouse-movement `NSEvent` monitor, which needs no Accessibility grant
+(only keyboard monitoring does) and does nothing at all while the cursor is
+still. It is installed only when the flag is set and a strip exists.
 
 ## Development
 

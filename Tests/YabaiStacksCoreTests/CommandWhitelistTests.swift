@@ -53,6 +53,16 @@ struct CommandWhitelistTests {
         commands.append(contentsOf: [.focusWindow(id: 0), .focusWindow(id: 577003), .focusWindow(id: -1)])
 
         for event in YabaiSignalEvent.allCases {
+            // The tripwire for the signal table: a new event has to be named
+            // here, and naming it is the moment to ask whether the action it
+            // will register is still read-only.
+            switch event {
+            case .applicationLaunched, .applicationTerminated, .applicationFrontSwitched,
+                 .windowCreated, .windowDestroyed, .windowFocused, .windowMoved, .windowResized,
+                 .windowMinimized, .windowDeminimized, .spaceChanged, .displayChanged,
+                 .missionControlEnter, .missionControlExit:
+                break
+            }
             commands.append(.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks", socket: "/tmp/s.sock"))
             commands.append(.removeSignal(event: event))
         }
@@ -114,9 +124,45 @@ struct CommandWhitelistTests {
         #expect(argv == [
             "signal", "--add",
             "event=window_created",
-            "action='/opt/bin/yabai-stacks' --notify --socket '/tmp/s.sock'",
+            "action='/opt/bin/yabai-stacks' --notify --socket '/tmp/s.sock' --event window_created",
             "label=yabai-stacks.window_created",
         ])
+    }
+
+    /// The action carries the event name so the daemon can tell a Mission
+    /// Control enter from a reason to re-query. It is the only unquoted value in
+    /// the action, which is safe only because it comes from the enum's own raw
+    /// values and never from anything a user can type.
+    @Test("the action names its own event, and every event name is shell-inert")
+    func signalActionCarriesItsEvent() {
+        for event in YabaiSignalEvent.allCases {
+            let argv = YabaiCommand.addSignal(
+                event: event, notifying: "/opt/bin/yabai-stacks", socket: "/tmp/s.sock"
+            ).argv
+            #expect(argv[3].hasSuffix(" --event \(event.rawValue)"))
+            #expect(event.rawValue.allSatisfy { $0.isLowercase || $0 == "_" })
+        }
+    }
+
+    @Test("Mission Control is registered like any other event and mutates nothing")
+    func missionControlSignalsAreOrdinary() {
+        let missionControl = YabaiSignalEvent.allCases.filter(\.isMissionControl)
+        #expect(Set(missionControl) == [.missionControlEnter, .missionControlExit])
+        #expect(YabaiSignalEvent.allCases.filter { !$0.isMissionControl }.count == 12)
+
+        for event in missionControl {
+            let add = YabaiCommand.addSignal(
+                event: event, notifying: "/opt/bin/yabai-stacks", socket: "/tmp/s.sock"
+            ).argv
+            #expect(add[2] == "event=" + event.rawValue)
+            #expect(add[3].contains("--notify"))
+            #expect(add.last == "label=" + YabaiSignalEvent.labelPrefix + event.rawValue)
+            #expect(Set(add).intersection(Self.forbiddenTokens).isEmpty)
+            #expect(
+                YabaiCommand.removeSignal(event: event).argv
+                    == ["signal", "--remove", "yabai-stacks." + event.rawValue]
+            )
+        }
     }
 
     /// yabai hands a signal action to a shell, so this quoting is the single
@@ -176,7 +222,7 @@ struct CommandWhitelistTests {
         let action = argv[3]
 
         #expect(action.hasPrefix("action='/opt/bin/yabai-stacks' --notify --socket '"))
-        #expect(action.hasSuffix("'"))
+        #expect(action.hasSuffix("' --event window_created"))
         #expect(action.filter { $0 == "'" }.count % 2 == 0)
     }
 

@@ -31,6 +31,8 @@ struct ConfigurationParserTests {
         #expect(configuration.offsetX == 0)
         #expect(configuration.offsetY == 0)
         #expect(configuration.minStackSize == 2)
+        #expect(configuration.titlebarInset == 78)
+        #expect(configuration.hideOnHover == false)
         #expect(configuration == Configuration())
     }
 
@@ -78,6 +80,8 @@ struct ConfigurationParserTests {
             "--offset-x", "-4",
             "--offset-y", "4",
             "--min-stack-size", "3",
+            "--titlebar-inset", "0",
+            "--hide-on-hover",
         ])
 
         #expect(configuration == Configuration(
@@ -92,8 +96,40 @@ struct ConfigurationParserTests {
             position: .right,
             offsetX: -4,
             offsetY: 4,
-            minStackSize: 3
+            minStackSize: 3,
+            titlebarInset: 0,
+            hideOnHover: true
         ))
+    }
+
+    /// A presence flag: it takes no value, so the token after it is the next
+    /// flag and must not be swallowed as this one's argument.
+    @Test("--hide-on-hover is off by default and takes no value")
+    func hideOnHoverFlag() throws {
+        #expect(try configuration([]).hideOnHover == false)
+        #expect(try configuration(["--hide-on-hover"]).hideOnHover == true)
+        #expect(try configuration(["--hide-on-hover"]) == Configuration(hideOnHover: true))
+
+        // The following flag survives in both orders, which is what proves the
+        // value was never consumed.
+        #expect(try configuration(["--hide-on-hover", "--icon-size", "40"])
+            == Configuration(iconSize: 40, hideOnHover: true))
+        #expect(try configuration(["--icon-size", "40", "--hide-on-hover"])
+            == Configuration(iconSize: 40, hideOnHover: true))
+
+        // Presence, not a toggle: repeating it does not turn it back off.
+        #expect(try configuration(["--hide-on-hover", "--hide-on-hover"]).hideOnHover == true)
+    }
+
+    @Test("--hide-on-hover does not swallow a positional or a bad flag after it")
+    func hideOnHoverDoesNotHideErrors() throws {
+        #expect(throws: ConfigurationError.unknownFlag("--bogus")) {
+            try ConfigurationParser.parse(["--hide-on-hover", "--bogus"])
+        }
+        #expect(throws: ConfigurationError.unexpectedArgument("true")) {
+            try ConfigurationParser.parse(["--hide-on-hover", "true"])
+        }
+        #expect(try ConfigurationParser.parse(["--hide-on-hover", "--help"]) == .help)
     }
 
     // MARK: - Intents
@@ -372,7 +408,7 @@ struct ConfigurationParserTests {
             "--icon-size", "--icon-spacing", "--padding", "--corner-radius",
             "--active-color", "--background-color", "--inactive-opacity",
             "--border-width", "--position", "--offset-x", "--offset-y",
-            "--min-stack-size", "--help", "--version",
+            "--min-stack-size", "--titlebar-inset", "--hide-on-hover", "--help", "--version",
         ] {
             #expect(usage.contains(flag), "usage omits \(flag)")
         }

@@ -49,6 +49,7 @@ public enum ConfigurationParser {
       --offset-y <pt>               default 0
       --min-stack-size <n>          default 2
       --titlebar-inset <pt>         default 78
+      --hide-on-hover               off by default; hides instead of clicking
       --help
       --version
 
@@ -110,6 +111,10 @@ public enum ConfigurationParser {
                 configuration.titlebarInset = try number(flag, try nextValue(for: flag))
             case "--min-stack-size":
                 configuration.minStackSize = try integer(flag, try nextValue(for: flag))
+            // Presence-only: it takes no value, so a following token is the
+            // next flag and must not be swallowed as this one's argument.
+            case "--hide-on-hover":
+                configuration.hideOnHover = true
             default:
                 throw flag.hasPrefix("-")
                     ? ConfigurationError.unknownFlag(flag)
