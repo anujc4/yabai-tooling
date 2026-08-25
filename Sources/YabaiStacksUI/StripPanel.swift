@@ -90,11 +90,14 @@ final class StripView: NSView {
             return
         }
         let inset = max(1, configuration.borderWidth)
+        let frame = localRect(at: active, in: render).insetBy(dx: -inset, dy: -inset)
         highlight.isHidden = false
-        highlight.frame = localRect(at: active, in: render).insetBy(dx: -inset, dy: -inset)
+        highlight.frame = frame
         highlight.borderColor = configuration.activeColor.cgColor
         highlight.borderWidth = inset
-        highlight.cornerRadius = min(inset * 2, configuration.cornerRadius)
+        // Clamped only by the ring's own size: half of the shorter side is a
+        // full capsule, and anything past that renders identically.
+        highlight.cornerRadius = min(configuration.cornerRadius, min(frame.width, frame.height) / 2)
         highlight.backgroundColor = .clear
     }
 
