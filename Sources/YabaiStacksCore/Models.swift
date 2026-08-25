@@ -25,7 +25,7 @@ public struct YabaiWindow: Codable, Hashable, Sendable {
     public let level: Int
     public let subrole: String
 
-    /// 0 means unstacked; >= 1 is a 1-based position, returned descending (SPEC 1, 3).
+    /// 0 means unstacked; >= 1 is a 1-based position, returned descending.
     public let stackIndex: Int
 
     public let isRootWindow: Bool

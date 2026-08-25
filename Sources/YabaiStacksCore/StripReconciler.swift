@@ -21,7 +21,7 @@ public struct StripRender: Hashable, Sendable {
 }
 
 /// A strip whose panel already exists. `previousKey` differs from `render.key`
-/// exactly when the frame moved: the frame is part of the identity (SPEC 2).
+/// exactly when the frame moved: the frame is part of the identity.
 public struct StripUpdate: Hashable, Sendable {
     public let previousKey: StackKey
     public let render: StripRender

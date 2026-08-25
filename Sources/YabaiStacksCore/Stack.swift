@@ -1,4 +1,5 @@
-/// Identity of a stack: the (space, frame) tuple. One space can hold two of them (SPEC 2).
+/// Identity of a stack: the (space, frame) tuple. One space can hold two of
+/// them as separate bsp leaves, and one stack's members share a frame.
 public struct StackKey: Hashable, Sendable {
     public let space: Int
     public let frame: FrameKey
@@ -50,13 +51,13 @@ extension StackKey: Comparable {
 }
 
 /// One detected stack on a visible space. A stack whose space is not the focused
-/// one legitimately has no active member (SPEC 5).
+/// one legitimately has no active member.
 public struct Stack: Hashable, Sendable {
     public let space: Int
     public let display: Int
     public let frame: YabaiFrame
 
-    /// Ascending `stackIndex`; yabai returns members descending (SPEC 3).
+    /// Ascending `stackIndex`; yabai returns members descending.
     public let members: [YabaiWindow]
 
     public let activeWindowID: Int?

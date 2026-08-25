@@ -49,7 +49,7 @@ public struct StackDetector: Sendable {
         var members: [YabaiWindow]
     }
 
-    /// `is-visible` reflects the window's space, not its place in the stack (SPEC 4, 6).
+    /// `is-visible` reflects the window's space, not its place in the stack.
     private static func isStackMember(_ window: YabaiWindow) -> Bool {
         window.stackIndex >= 1 && !window.isFloating && !window.isMinimized && !window.isHidden
     }

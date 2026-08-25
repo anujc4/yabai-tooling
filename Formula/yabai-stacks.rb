@@ -16,18 +16,6 @@ class YabaiStacks < Formula
     bin.install ".build/release/yabai-stacks"
   end
 
-  def caveats
-    <<~EOS
-      yabai-stacks runs alongside yabai. Add it to ~/.config/yabai/yabairc,
-      next to borders, and reload yabai:
-
-        yabai-stacks --icon-size 32 --position right &
-
-      It registers the yabai signals it needs at startup and removes them on
-      exit, so no signal configuration is required.
-    EOS
-  end
-
   test do
     assert_match "yabai-stacks", shell_output("#{bin}/yabai-stacks --version")
     assert_match "--icon-size", shell_output("#{bin}/yabai-stacks --help")

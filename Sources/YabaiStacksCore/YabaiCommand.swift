@@ -35,7 +35,7 @@ public enum YabaiQuery: Hashable, Sendable {
     case spaces(SpaceScope)
     case displays
 
-    /// Only these scopes keep the response a JSON array (SPEC § Query response shapes).
+    /// Only these scopes keep the response a JSON array; the rest return an object.
     public enum WindowScope: Hashable, Sendable {
         case all
         case currentSpace

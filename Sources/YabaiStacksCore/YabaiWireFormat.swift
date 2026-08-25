@@ -1,7 +1,7 @@
 import Foundation
 
 // uint32 LE payload length, then NUL-terminated argv plus one extra NUL; see
-// docs/SPEC.md § yabai IPC.
+// uint32 little-endian payload length, then NUL-separated argv.
 enum YabaiWireFormat {
     static let failureByte: UInt8 = 0x07
 
