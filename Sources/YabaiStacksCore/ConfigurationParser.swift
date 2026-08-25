@@ -23,8 +23,7 @@ extension ConfigurationError: CustomStringConvertible {
     }
 }
 
-/// What the caller should do, rather than a side effect: the parser never
-/// prints and never exits, so every path is testable.
+/// The parser never prints and never exits, so every path is testable.
 public enum CommandLineIntent: Hashable, Sendable {
     case help
     case version
@@ -56,13 +55,9 @@ public enum ConfigurationParser {
     Colors accept 0xAARRGGBB, 0xRRGGBB and #RRGGBB.
     """
 
-    /// `arguments` excludes the executable name. Repeated flags are last-wins;
-    /// `--help`/`--version` short-circuit, so flags after them are not read
-    /// while a malformed flag before them still fails. Short-circuiting also
-    /// skips `validate()`, so the two kinds of bad input differ deliberately:
-    /// `--position bogus --help` fails at parse time, while
-    /// `--inactive-opacity 9 --help` returns `.help` because range checking only
-    /// happens once the whole argv has been read.
+    /// Repeated flags are last-wins. `--help`/`--version` return before `validate()`,
+    /// so `--inactive-opacity 9 --help` succeeds while `--bogus --help` still throws:
+    /// parse errors fire in place, range errors only once the whole argv is read.
     public static func parse(_ arguments: [String]) throws -> CommandLineIntent {
         var configuration = Configuration()
         var index = arguments.startIndex
@@ -111,8 +106,6 @@ public enum ConfigurationParser {
                 configuration.titlebarInset = try number(flag, try nextValue(for: flag))
             case "--min-stack-size":
                 configuration.minStackSize = try integer(flag, try nextValue(for: flag))
-            // Presence-only: it takes no value, so a following token is the
-            // next flag and must not be swallowed as this one's argument.
             case "--hide-on-hover":
                 configuration.hideOnHover = true
             default:
@@ -126,9 +119,8 @@ public enum ConfigurationParser {
         return .run(configuration)
     }
 
-    // `Double(_:)` also accepts hex floats, so `--icon-size 0x18` would silently
-    // mean 24pt in a CLI whose 0x prefix means a colour everywhere else. `+5`,
-    // `.5`, `5.` and `1e2` stay valid.
+    // `Double(_:)` accepts hex floats, so `--icon-size 0x18` would silently mean
+    // 24pt in a CLI whose 0x prefix means a colour everywhere else.
     private static func number(_ flag: String, _ value: String) throws -> Double {
         guard !value.contains(where: { "xXpP".contains($0) }), let parsed = Double(value) else {
             throw ConfigurationError.invalidValue(flag: flag, value: value, expected: "a number")

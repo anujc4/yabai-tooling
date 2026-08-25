@@ -1,9 +1,6 @@
 import AppKit
 import YabaiStacksCore
 
-/// Resolves a pid to a rasterised icon. Deliberately thin: the keying and
-/// eviction policy lives in `KeyedCache`, which is unit-tested, and only the
-/// AppKit call and the bitmap draw live here, where nothing is.
 @MainActor
 public final class AppIconProvider {
     public static let defaultCapacity = 64
@@ -17,8 +14,7 @@ public final class AppIconProvider {
         }
     }
 
-    /// nil when the pid has no resolvable icon — the app quit between the query
-    /// and the draw, most often. Callers skip that icon; nothing here traps.
+    /// nil when the app quit between the query and the draw; callers skip that icon.
     public func icon(forPID pid: Int) -> CGImage? {
         cache.value(for: pid)
     }

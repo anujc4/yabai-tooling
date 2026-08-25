@@ -16,9 +16,6 @@ func value(after flag: String) -> String? {
     return arguments[arguments.index(after: index)]
 }
 
-// Runs once per yabai event and must exit fast; nothing else is set up. The
-// socket path is passed in rather than re-derived: this runs under yabai's
-// environment, which need not carry USER or any override the daemon saw.
 if arguments.contains("--notify") {
     try? NotificationSocket.notify(
         path: value(after: "--socket") ?? NotificationSocket.defaultPath(),
@@ -50,8 +47,7 @@ let client = YabaiClient(transport: YabaiSocketTransport())
 let detector = StackDetector(minStackSize: configuration.minStackSize)
 let socketPath = NotificationSocket.defaultPath()
 
-// Another daemon holding the socket would otherwise be silently disabled: our
-// listen() unlinks the path, and our registration loop replaces its signals.
+// Starting anyway would unlink the running daemon's socket and replace its signals.
 if NotificationSocket.isServed(path: socketPath) {
     fail("another yabai-stacks is already running on \(socketPath)")
 }
@@ -67,21 +63,16 @@ controller.onSelect = { id in
 let socket = NotificationSocket(path: socketPath)
 let executable = ExecutablePath.resolved(argv0: CommandLine.arguments.first)
 
-// Touched from the main queue during normal operation and once more from the
-// atexit handler, by which point every other thread is gone.
+// Main queue during operation, then the atexit handler once no other thread is left.
 nonisolated(unsafe) var registered = false
 nonisolated(unsafe) var tornDown = false
 
-/// A failure here is not cosmetic: the event whose signal did not register is
-/// an event the daemon will never hear about, and a yabai too old for one of
-/// them would silently lose that feature. Failures are reported and leave
-/// `registered` false, so the next successful refresh tries the whole table
-/// again.
+/// A signal that fails to register is an event the daemon never hears about, so
+/// failures leave `registered` false and the next refresh retries the table.
 func register() {
     var failures: [String] = []
     for event in YabaiSignalEvent.allCases {
-        // Replace rather than accumulate: a run killed with SIGKILL leaves its
-        // signals behind, and yabai will happily hold two under one label.
+        // A SIGKILLed run leaves its signals behind; yabai holds two under one label.
         client.removeSignal(event)
         do {
             try client.addSignal(event, notifying: executable, socket: socketPath)
@@ -112,21 +103,16 @@ func refresh() {
         let displays = try client.displays()
         controller.apply(stacks: detector.detect(windows: windows, spaces: spaces), displays: displays)
 
-        // A yabai restart wipes its signal table, so a refresh that succeeds
-        // after a failure is the moment to put our signals back.
+        // A yabai restart wipes its signal table.
         if !registered { register() }
     } catch {
-        // Dropping one repaint is recoverable; the next event repaints. Exiting
-        // would leave the user with no overlays at all.
         registered = false
         FileHandle.standardError.write(Data("yabai-stacks: refresh failed: \(error)\n".utf8))
     }
 }
 
-/// yabai emits several signals per user action — creating a window fires
-/// window_created, then window_focused, then application_front_switched. One
-/// repaint per burst is enough, and coalescing keeps a drag from re-querying
-/// on every frame.
+/// yabai emits several signals per user action, and a drag emits one per frame;
+/// one repaint per burst is enough.
 let coalesceInterval = DispatchTimeInterval.milliseconds(40)
 var pending: DispatchWorkItem?
 
@@ -140,9 +126,6 @@ func scheduleRefresh() {
 
 do {
     try socket.listen { name in
-        // The decision itself lives in Core, where it can be tested; this
-        // target has none. Mission Control does not change the stacks, only
-        // whether they should be on screen, so it skips the re-query entirely.
         let action = WakeAction.action(for: name)
         DispatchQueue.main.async {
             switch action {
@@ -159,8 +142,7 @@ do {
 register()
 
 // DispatchSource rather than signal(2): the handler runs on a normal queue, so
-// it can talk to yabai and AppKit instead of being restricted to
-// async-signal-safe calls.
+// it is not restricted to async-signal-safe calls.
 let terminationSources = [SIGINT, SIGTERM].map { number -> DispatchSourceSignal in
     signal(number, SIG_IGN)
     let source = DispatchSource.makeSignalSource(signal: number, queue: .main)

@@ -1,15 +1,11 @@
-/// The complete set of messages this program is able to send to yabai (R4).
-/// There is no case carrying a free-form command string, and `argv` is internal
-/// so that outside this module a command can only be named, never spelled: the
-/// whitelist is a compile-time property, not a runtime check.
+/// Every message this program can send to yabai (R4). `argv` is internal, so
+/// outside this module a command can be named but never spelled.
 public enum YabaiCommand: Hashable, Sendable {
     case query(YabaiQuery)
     case focusWindow(id: Int)
 
-    /// Signals are not layout: adding one changes what yabai notifies us about,
-    /// never where a window sits. The action is built from an executable path
-    /// rather than taken as a string, and the label is derived from the event,
-    /// so neither an arbitrary command nor another program's label is spellable.
+    /// On the whitelist because a signal changes what yabai notifies us about,
+    /// never where a window sits.
     case addSignal(event: YabaiSignalEvent, notifying: String, socket: String)
     case removeSignal(event: YabaiSignalEvent)
 
@@ -20,10 +16,8 @@ public enum YabaiCommand: Hashable, Sendable {
         case .focusWindow(let id):
             return ["window", "--focus", String(id)]
         case .addSignal(let event, let executable, let socket):
-            // The socket path is resolved by the daemon and baked in: the child
-            // runs under yabai's environment, which may not carry USER or any
-            // override, and would otherwise derive a different path and deliver
-            // its wake-up nowhere.
+            // The socket path is baked in: the child runs under yabai's environment,
+            // which may not carry USER, and would derive a different path.
             return [
                 "signal", "--add",
                 "event=\(event.rawValue)",
@@ -41,9 +35,7 @@ public enum YabaiQuery: Hashable, Sendable {
     case spaces(SpaceScope)
     case displays
 
-    /// Scopes are split per domain because only these combinations keep yabai's
-    /// response a JSON array; `--spaces --space` and `--displays --display`
-    /// return a single object instead (verified against v7.1.24).
+    /// Only these scopes keep the response a JSON array (SPEC § Query response shapes).
     public enum WindowScope: Hashable, Sendable {
         case all
         case currentSpace

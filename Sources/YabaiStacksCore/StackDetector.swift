@@ -1,9 +1,7 @@
-/// Turns a window list and a space list into the stacks worth drawing.
 public struct StackDetector: Sendable {
     public static let defaultMinStackSize = 2
 
-    /// Stored verbatim: `Configuration.validate()` is the single gate that
-    /// rejects out-of-range values, so the detector does not also clamp.
+    /// Not clamped here: `Configuration.validate()` is the single gate for ranges.
     public let minStackSize: Int
 
     public init(minStackSize: Int = StackDetector.defaultMinStackSize) {
@@ -51,15 +49,11 @@ public struct StackDetector: Sendable {
         var members: [YabaiWindow]
     }
 
-    /// `is-visible` is deliberately not consulted: it reflects the window's
-    /// space, not its position in the stack (SPEC 4, SPEC 6).
+    /// `is-visible` reflects the window's space, not its place in the stack (SPEC 4, 6).
     private static func isStackMember(_ window: YabaiWindow) -> Bool {
         window.stackIndex >= 1 && !window.isFloating && !window.isMinimized && !window.isHidden
     }
 
-    /// Ordered on `FrameKey`, not on the raw frame: `Double` comparison is not a
-    /// strict weak ordering once a coordinate is NaN, which would make the sort
-    /// itself non-deterministic.
     private static func precedes(_ lhs: Stack, _ rhs: Stack) -> Bool {
         let left = lhs.key.frame
         let right = rhs.key.frame

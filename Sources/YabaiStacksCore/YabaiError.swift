@@ -52,8 +52,7 @@ extension YabaiError: CustomStringConvertible {
         }
     }
 
-    // strerror keeps a shared static buffer for unknown codes; the _r form is
-    // the only one safe to call from the event loop's threads.
+    // strerror shares a static buffer for unknown codes; only the _r form is safe here.
     private static func message(_ code: Int32) -> String {
         var buffer = [CChar](repeating: 0, count: 256)
         let status = buffer.withUnsafeMutableBufferPointer { pointer -> Int32 in

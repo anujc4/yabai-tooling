@@ -1,4 +1,3 @@
-/// A plain colour value. Core never imports AppKit; the UI target converts.
 public struct RGBAColor: Hashable, Sendable {
     public let red: UInt8
     public let green: UInt8
@@ -30,8 +29,6 @@ public struct RGBAColor: Hashable, Sendable {
     public var blueFraction: Double { Double(blue) / 255 }
     public var alphaFraction: Double { Double(alpha) / 255 }
 
-    /// `0xAARRGGBB`, `0xRRGGBB` and `#RRGGBB`; the six-digit forms imply an
-    /// opaque alpha. A `0x` or `#` prefix is required.
     public static func parse(_ text: String) -> RGBAColor? {
         let digits: Substring
         if text.hasPrefix("0x") || text.hasPrefix("0X") {

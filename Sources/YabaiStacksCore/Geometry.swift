@@ -51,11 +51,8 @@ public struct Rect: Hashable, Sendable {
         YabaiFrame(x: x, y: y, w: width, h: height)
     }
 
-    /// Half-open on both axes, so two rects that touch never both contain the
-    /// same point: a rect owns its low-coordinate edges (`minX`/`minY`) and not
-    /// its high ones. Which edge that is on screen depends on the space — a
-    /// yabai rect owns its top edge, the same rect converted to AppKit owns its
-    /// bottom edge — so ownership does not survive conversion.
+    /// Half-open on both axes, so two touching rects never both contain a point:
+    /// a click on a boundary resolves to exactly one icon.
     public func contains(_ point: Point) -> Bool {
         point.x >= minX && point.x < maxX && point.y >= minY && point.y < maxY
     }
@@ -64,9 +61,7 @@ public struct Rect: Hashable, Sendable {
         Rect(x: x + dx, y: y + dy, width: width, height: height)
     }
 
-    /// Positive insets shrink, negative ones grow. A shrink deeper than half an
-    /// edge would flip that edge past the other, so the size floors at zero and
-    /// the rect collapses onto its own centre instead.
+    /// Negative insets grow. An over-deep shrink collapses the rect onto its centre.
     public func insetBy(dx: Double, dy: Double) -> Rect {
         Rect(
             x: x + min(dx, width / 2),
@@ -77,13 +72,8 @@ public struct Rect: Hashable, Sendable {
     }
 }
 
-/// yabai reports frames in top-left-origin global coordinates; AppKit puts the
-/// origin at the bottom-left of the primary display. Both systems share that
-/// display's corner, so one flip converts every display, including ones at a
-/// negative origin, and `x` is never touched.
-///
-/// The primary display's height is a parameter because Core must not import
-/// AppKit and so cannot read `NSScreen` itself.
+/// yabai reports frames top-left-origin, AppKit bottom-left. Both share the
+/// primary display's corner, so one flip converts every display and `x` never moves.
 public enum Geometry {
     public static func appKitRect(fromYabai rect: Rect, primaryDisplayHeight: Double) -> Rect {
         Rect(x: rect.x, y: primaryDisplayHeight - rect.maxY, width: rect.width, height: rect.height)
@@ -98,9 +88,8 @@ public enum Geometry {
         appKitRect(fromYabai: rect, primaryDisplayHeight: primaryDisplayHeight)
     }
 
-    /// A point carries no height to subtract, so this is not the rect formula
-    /// with a zero-height rect substituted; converting a rect's origin is not
-    /// the same as converting the rect.
+    /// Converting a rect's origin is not converting the rect: the origin lands on the
+    /// converted rect's top edge, not its bottom.
     public static func appKitPoint(fromYabai point: Point, primaryDisplayHeight: Double) -> Point {
         Point(x: point.x, y: primaryDisplayHeight - point.y)
     }
@@ -112,11 +101,7 @@ public enum Geometry {
     public static let minimumDevicePixels = 1
     public static let maximumDevicePixels = 4096
 
-    /// Backing-store pixels for a point size at a display scale. Lives here
-    /// rather than in the icon adapter because it is pure arithmetic, and
-    /// `Int(_:)` traps on a value that does not fit: every non-finite or absurd
-    /// input has to be folded into range before the conversion, which is only
-    /// checkable where there are tests.
+    /// `Int(_:)` traps on a value that does not fit, so every input is folded into range.
     public static func devicePixels(pointSize: Double, scale: Double) -> Int {
         let pixels = (pointSize * scale).rounded()
         guard !pixels.isNaN else { return minimumDevicePixels }

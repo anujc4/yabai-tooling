@@ -11,8 +11,7 @@ public struct YabaiSocketTransport: YabaiTransport {
 
     public let path: String
 
-    /// Budget for the whole request, not a per-read idle timer: a server that
-    /// dribbles bytes forever must still be cut off at `timeout`.
+    /// Budget for the whole request, not a per-read idle timer.
     public let timeout: TimeInterval
 
     public let maxResponseBytes: Int
@@ -29,9 +28,8 @@ public struct YabaiSocketTransport: YabaiTransport {
         self.maxResponseBytes = max(1, maxResponseBytes)
     }
 
-    /// Zero, negative and non-finite timeouts all mean "block forever" to the
-    /// kernel, and `UInt64(.infinity)` traps, so every value is folded into a
-    /// finite, strictly positive window before it can reach a deadline.
+    /// Zero, negative and non-finite timeouts all mean "block forever" to the kernel,
+    /// and `UInt64(.infinity)` traps.
     public static func clampedTimeout(_ timeout: TimeInterval) -> TimeInterval {
         guard !timeout.isNaN else { return defaultTimeout }
         guard timeout.isFinite else { return timeout > 0 ? maximumTimeout : minimumTimeout }
@@ -64,9 +62,8 @@ public struct YabaiSocketTransport: YabaiTransport {
         return try YabaiWireFormat.validate(response: readToEndOfFile(from: descriptor, before: deadline))
     }
 
-    /// Socket options are set exactly once, while the socket is still fresh:
-    /// Darwin rejects `setsockopt` with EINVAL once the peer has hung up, and
-    /// yabai answers by writing and immediately closing.
+    /// Set once while the socket is fresh: Darwin rejects `setsockopt` with EINVAL
+    /// once the peer has hung up, and yabai writes and immediately closes.
     func configure(_ descriptor: Int32) throws {
         var enabled: Int32 = 1
         guard setsockopt(

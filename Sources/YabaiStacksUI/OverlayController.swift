@@ -1,9 +1,7 @@
 import AppKit
 import YabaiStacksCore
 
-/// Owns the live panels and applies a `StripDiff` to them. Panels are reused
-/// across refreshes — rebuilding them on every yabai event flickers and throws
-/// away the icon layers for no reason.
+/// Owns the live panels and applies a `StripDiff`. Panels are reused across refreshes.
 @MainActor
 public final class OverlayController {
     private let configuration: Configuration
@@ -11,16 +9,13 @@ public final class OverlayController {
     private var panels: [StackKey: StripPanel] = [:]
     private var rendered: [StackKey: StripRender] = [:]
 
-    /// Two independent reasons to be out of the way, kept apart because either
-    /// can end while the other still holds: a cursor leaving a strip must not
-    /// bring it back on top of Mission Control. Mission Control takes every
-    /// strip; hover takes only the ones actually under the cursor.
+    /// Two independent reasons to be out of the way, kept apart because either can end
+    /// while the other holds. Mission Control takes every strip, hover only some.
     private var parkedByMissionControl = false
     private var parkedByHover: Set<StackKey> = []
     private var hoverMonitor: Any?
 
-    /// Called with the window id behind a clicked icon. Never called under
-    /// `--hide-on-hover`, where no click action is registered at all.
+    /// Never called under `--hide-on-hover`, where no click action is registered.
     public var onSelect: ((Int) -> Void)?
 
     public init(configuration: Configuration, scale: Double = Double(NSScreen.main?.backingScaleFactor ?? 2)) {
@@ -28,8 +23,7 @@ public final class OverlayController {
         icons = AppIconProvider(pointSize: configuration.iconSize, scale: scale)
     }
 
-    /// AppKit's origin sits at the bottom-left of the primary display, which is
-    /// `NSScreen.screens[0]` — not `NSScreen.main`, which follows the key window.
+    /// The primary display is `NSScreen.screens[0]`, not `.main`, which follows the key window.
     private var primaryDisplayHeight: Double {
         NSScreen.screens.first.map { Double($0.frame.height) } ?? 0
     }
@@ -52,9 +46,7 @@ public final class OverlayController {
         }
 
         rendered = diff.rendered
-        // The home rects have just moved, so which strips the cursor is over can
-        // have changed even though the cursor has not. Decided before anything
-        // is placed, so each panel is put in its final position once.
+        // The home rects have moved, so the hover set can change though the cursor has not.
         if refreshHoverState() { applyParking(animated: false) }
 
         let height = primaryDisplayHeight
@@ -64,9 +56,8 @@ public final class OverlayController {
                 create(update.render, height: height)
                 continue
             }
-            // Placed rather than framed at its home rect: a refresh coalesced in
-            // behind a hide would otherwise drag every panel it touches back on
-            // screen and undo it.
+            // Placed, not framed at its home rect: a refresh coalesced in behind a
+            // hide would otherwise drag the panel back on screen.
             panel.apply(
                 render: update.render,
                 icons: icons,
@@ -97,9 +88,7 @@ public final class OverlayController {
         panels[render.key] = panel
     }
 
-    /// Mission Control draws over everything, and a floating panel sitting on
-    /// top of it looks pinned to the glass. Sliding the strips off the desktop's
-    /// edge and back reads as them getting out of the way.
+    /// A floating panel left on top of Mission Control looks pinned to the glass.
     public func setHidden(_ hidden: Bool, animated: Bool) {
         guard hidden != parkedByMissionControl else { return }
         parkedByMissionControl = hidden
@@ -131,9 +120,6 @@ public final class OverlayController {
         NSRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
     }
 
-    /// Measured against every screen at once. Sending a strip past the near edge
-    /// of its own screen leaves it fully visible on the neighbouring one, where
-    /// Mission Control is drawing too.
     private static func parked(_ home: Rect) -> Rect {
         let screens = NSScreen.screens.map {
             Rect(x: $0.frame.minX, y: $0.frame.minY, width: $0.frame.width, height: $0.frame.height)
@@ -143,10 +129,8 @@ public final class OverlayController {
 
     // MARK: - Hover
 
-    /// Only armed while `--hide-on-hover` is set and there is something to
-    /// hover over, so the common case installs no monitor at all. The monitor is
-    /// for mouse movement only — a keyboard monitor is what needs an
-    /// Accessibility grant — and it does no work while the cursor is still.
+    /// Mouse movement only: a keyboard monitor is what needs an Accessibility grant.
+    /// Installed only while `--hide-on-hover` is set and a strip exists.
     private func updateHoverMonitor() {
         guard configuration.hideOnHover else { return }
 
@@ -158,9 +142,7 @@ public final class OverlayController {
         }
 
         guard hoverMonitor == nil else { return }
-        // The hop to main is explicit rather than assumed: `assumeIsolated` on a
-        // queue that turned out not to be main is a crash, and this monitor's
-        // delivery queue is not something the daemon gets to check.
+        // `assumeIsolated` on a queue that turns out not to be main is a crash.
         hoverMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
         ) { [weak self] _ in

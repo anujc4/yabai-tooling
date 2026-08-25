@@ -1,7 +1,7 @@
 import Foundation
 
-// uint32 little-endian payload length, then NUL-terminated argv plus one extra
-// NUL; see docs/SPEC.md § yabai IPC for the captured bytes.
+// uint32 LE payload length, then NUL-terminated argv plus one extra NUL; see
+// docs/SPEC.md § yabai IPC.
 enum YabaiWireFormat {
     static let failureByte: UInt8 = 0x07
 
@@ -9,9 +9,8 @@ enum YabaiWireFormat {
         encode(argv: command.argv)
     }
 
-    /// NUL is the argv delimiter, so an element containing one would silently
-    /// become several on the wire and defeat the audit that reads argv as
-    /// `[String]`.
+    /// NUL is the argv delimiter, so an element carrying one would silently become
+    /// several on the wire.
     static func containsDelimiter(_ argv: [String]) -> Bool {
         argv.contains { $0.utf8.contains(0) }
     }

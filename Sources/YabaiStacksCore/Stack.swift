@@ -1,6 +1,4 @@
-/// Identity of a stack: the (space, frame) tuple. Two independent stacks can
-/// live in one space as separate bsp leaves, and the members of one stack share
-/// a byte-identical frame (SPEC 2).
+/// Identity of a stack: the (space, frame) tuple. One space can hold two of them (SPEC 2).
 public struct StackKey: Hashable, Sendable {
     public let space: Int
     public let frame: FrameKey
@@ -11,10 +9,8 @@ public struct StackKey: Hashable, Sendable {
     }
 }
 
-/// A frame reduced to a hashable key. Raw `Double`s are a poor dictionary key:
-/// NaN is equal to nothing, so a NaN-bearing frame would be unreachable in the
-/// table, and exact bit equality makes grouping hostage to the last decimal.
-/// Coordinates are quantised to milli-points instead, giving total equality.
+/// Quantised to milli-points: a raw `Double` key goes unreachable once a coordinate
+/// is NaN, and bit equality makes grouping hostage to the last decimal.
 public struct FrameKey: Hashable, Sendable {
     public static let scale: Double = 1000
 
@@ -30,8 +26,7 @@ public struct FrameKey: Hashable, Sendable {
         h = Self.quantise(frame.h)
     }
 
-    // Int64.min is reserved for NaN so that two NaN frames group together
-    // rather than vanishing; infinities saturate one step inside it.
+    // Int64.min is reserved for NaN so two NaN frames group rather than vanish.
     static func quantise(_ value: Double) -> Int64 {
         guard !value.isNaN else { return Int64.min }
         let scaled = (value * scale).rounded()
@@ -41,10 +36,7 @@ public struct FrameKey: Hashable, Sendable {
     }
 }
 
-/// Ordered on the quantised key rather than on the raw frame, so the ordering
-/// stays a strict weak ordering even for a NaN-bearing frame. Exists so a
-/// reconciliation diff can report keys in a stable order without the caller
-/// having kept the stacks they came from.
+/// Ordered on the quantised key, so the ordering stays strict-weak even for NaN.
 extension FrameKey: Comparable {
     public static func < (lhs: FrameKey, rhs: FrameKey) -> Bool {
         (lhs.y, lhs.x, lhs.w, lhs.h) < (rhs.y, rhs.x, rhs.w, rhs.h)
@@ -57,9 +49,8 @@ extension StackKey: Comparable {
     }
 }
 
-/// One detected stack on a visible space. `Equatable` so two refreshes can be
-/// diffed; `activeWindowID` is optional because a stack whose space is not the
-/// focused one legitimately has no active member (SPEC 5).
+/// One detected stack on a visible space. A stack whose space is not the focused
+/// one legitimately has no active member (SPEC 5).
 public struct Stack: Hashable, Sendable {
     public let space: Int
     public let display: Int

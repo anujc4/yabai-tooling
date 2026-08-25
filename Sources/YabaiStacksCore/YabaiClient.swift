@@ -1,7 +1,5 @@
 import Foundation
 
-/// The only way the rest of the program talks to yabai. Every method maps to a
-/// `YabaiCommand` case, and `YabaiCommand` cannot express anything else.
 public struct YabaiClient: Sendable {
     private let transport: any YabaiTransport
 
@@ -30,8 +28,7 @@ public struct YabaiClient: Sendable {
         _ = try transport.send(.addSignal(event: event, notifying: executable, socket: socket))
     }
 
-    /// Removing a signal we never added is not an error worth failing over:
-    /// cleanup runs on a signal handler and must be idempotent.
+    /// Cleanup runs on a signal handler: removing a signal we never added is not a failure.
     public func removeSignal(_ event: YabaiSignalEvent) {
         _ = try? transport.send(.removeSignal(event: event))
     }

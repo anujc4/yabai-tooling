@@ -7,9 +7,8 @@ extension RGBAColor {
     }
 }
 
-/// Draws one strip. Icons are `CALayer` contents rather than `drawRect` output,
-/// so a refresh that only changes the highlight is a compositing change and
-/// never a redraw.
+/// Draws one strip. Icons are `CALayer` contents, so a refresh that only changes
+/// the highlight composites rather than redraws.
 final class StripView: NSView {
     private let configuration: Configuration
     private let background = CALayer()
@@ -18,7 +17,6 @@ final class StripView: NSView {
 
     private(set) var render: StripRender
 
-    /// Set by the owning panel; turns a click into a yabai focus request.
     var onSelect: ((Int) -> Void)?
 
     init(render: StripRender, configuration: Configuration, icons: AppIconProvider) {
@@ -38,9 +36,8 @@ final class StripView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    /// Icon rects are computed in yabai's top-left-origin space, so the view
-    /// has to share that origin. Unflipped, a vertical strip would render its
-    /// first member at the bottom, and clicks would agree with the wrong order.
+    /// Icon rects are computed in yabai's top-left-origin space, so the view shares it;
+    /// unflipped, a vertical strip would render its first member at the bottom.
     override var isFlipped: Bool { true }
 
     func apply(render: StripRender, icons: AppIconProvider) {
@@ -74,16 +71,12 @@ final class StripView: NSView {
             layer.frame = localRect(at: index, in: render)
             layer.contents = render.pid(forIcon: index).flatMap { icons.icon(forPID: $0) }
             layer.opacity = index == render.layout.activeIndex ? 1 : Float(configuration.inactiveOpacity)
-            // A pid whose app quit mid-refresh has no icon; the slot stays blank
-            // rather than shifting every icon after it out of alignment.
+            // A pid whose app quit mid-refresh has no icon; the slot stays blank.
             layer.isHidden = layer.contents == nil
         }
     }
 
-    /// The active member is ringed rather than tinted, so the icon itself stays
-    /// recognisable. The strip itself is deliberately unbordered: the ring is
-    /// the only thing that needs to draw the eye. A stack on a visible but
-    /// unfocused space has no active member at all (SPEC 5).
+    /// Ringed rather than tinted, so the icon itself stays recognisable.
     private func layoutHighlight(render: StripRender) {
         guard let active = render.layout.activeIndex else {
             highlight.isHidden = true
@@ -95,8 +88,7 @@ final class StripView: NSView {
         highlight.frame = frame
         highlight.borderColor = configuration.activeColor.cgColor
         highlight.borderWidth = inset
-        // Clamped only by the ring's own size: half of the shorter side is a
-        // full capsule, and anything past that renders identically.
+        // Half the shorter side is already a full capsule; past that renders the same.
         highlight.cornerRadius = min(configuration.cornerRadius, min(frame.width, frame.height) / 2)
         highlight.backgroundColor = .clear
     }
@@ -119,10 +111,8 @@ final class StripView: NSView {
     }
 }
 
-/// A borderless, non-activating panel sized exactly to its strip. Sizing it to
-/// the strip rather than the window is what lets it take clicks without an
-/// event tap or an Accessibility grant, while leaving the rest of the window
-/// untouched.
+/// A borderless, non-activating panel sized exactly to its strip. Sizing it to the
+/// strip is what lets it take clicks without an event tap or an Accessibility grant.
 final class StripPanel: NSPanel {
     private let stripView: StripView
 
@@ -140,10 +130,7 @@ final class StripPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = false
         isMovable = false
-        // Under --hide-on-hover the panel is out of the mouse path entirely, so
-        // a click can never be swallowed by a strip that has not finished
-        // getting out of the way. Hover is detected from cursor position, which
-        // needs no events delivered here.
+        // Out of the mouse path entirely, so a click cannot be swallowed mid-slide.
         ignoresMouseEvents = configuration.hideOnHover
         hidesOnDeactivate = false
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)))
@@ -151,8 +138,7 @@ final class StripPanel: NSPanel {
         contentView = stripView
     }
 
-    /// Clicking an icon must never move focus to the overlay itself — the whole
-    /// point is to hand focus to the window the icon stands for.
+    /// Clicking an icon must hand focus to the window it stands for, never the overlay.
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
@@ -173,8 +159,7 @@ final class StripPanel: NSPanel {
         }
     }
 
-    /// The frame is supplied rather than derived: a strip that is currently
-    /// parked out of the way must stay parked across a refresh.
+    /// The frame is supplied rather than derived, so a parked strip stays parked.
     func apply(render: StripRender, icons: AppIconProvider, screenFrame: NSRect) {
         setFrame(screenFrame, display: false)
         stripView.frame = NSRect(origin: .zero, size: screenFrame.size)

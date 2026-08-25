@@ -1,12 +1,7 @@
 import Foundation
 
-/// A least-recently-used cache holding the whole keying and eviction policy, so
-/// the icon cache's behaviour is testable without AppKit. The icon adapter in
-/// the UI target supplies the loader and nothing else.
-///
-/// Deliberately not `Sendable`: the loader is an ordinary closure, so a
-/// conformance would launder whatever non-Sendable state it captures. The one
-/// consumer holds a cache privately on the main actor.
+/// An LRU cache. Deliberately not `Sendable`: the loader is an ordinary closure,
+/// so a conformance would launder whatever non-Sendable state it captures.
 public final class KeyedCache<Key: Hashable, Value> {
     public typealias Loader = (Key) -> Value?
 
@@ -15,15 +10,11 @@ public final class KeyedCache<Key: Hashable, Value> {
     private let lock = NSLock()
     private let load: Loader
 
-    /// A failed load is cached as `.some(nil)` so one refresh cannot hammer a
-    /// key that cannot be resolved. It is not cached across refreshes: `retain`
-    /// drops misses, because an app queried mid-launch has no icon yet and must
-    /// get one on the next event rather than staying blank while it is visible.
+    /// A failed load is cached as `.some(nil)`, so one refresh cannot hammer a key.
     private var entries: [Key: Value?] = [:]
     private var recency: [Key] = []
 
-    /// The loader runs while the lock is held: that is what makes "at most one
-    /// load per key" true, and it means the loader must not re-enter the cache.
+    /// The loader runs while the lock is held, so it must not re-enter the cache.
     public init(capacity: Int, load: @escaping Loader) {
         self.capacity = max(1, capacity)
         self.load = load
@@ -55,9 +46,8 @@ public final class KeyedCache<Key: Hashable, Value> {
         return entries[key] != nil
     }
 
-    /// Drops every key outside `keys`, which is how a refresh forgets apps that
-    /// are no longer on screen, and drops cached misses among the survivors so
-    /// the next refresh retries them.
+    /// Drops every key outside `keys`, and cached misses among the survivors, so a
+    /// key that could not be resolved is retried on the next refresh.
     public func retain(_ keys: some Sequence<Key>) {
         let kept = Set(keys)
         lock.lock()
@@ -106,10 +96,8 @@ public final class KeyedCache<Key: Hashable, Value> {
         }
     }
 
-    // A re-entrant loader deadlocks on the non-recursive lock, which surfaces as
-    // a frozen process rather than a stack trace. The thread is recorded, not a
-    // flag: a second thread waiting on the lock is legitimate, the same thread
-    // arriving twice is not. Debug-only, so release builds pay nothing.
+    // A thread rather than a flag: a second thread waiting on the lock is legitimate,
+    // the same thread arriving twice is a deadlock.
     #if DEBUG
     private let reentrancyLock = NSLock()
     private var loadingThread: Thread?

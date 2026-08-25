@@ -4,8 +4,6 @@ public enum StripPosition: String, Hashable, Sendable, CaseIterable {
     case right
 }
 
-/// Icons run left-to-right or top-to-bottom. Vertical keeps a wide stack's
-/// strip out of the window's own titlebar area.
 public enum StripOrientation: String, Hashable, Sendable, CaseIterable {
     case horizontal
     case vertical
@@ -27,9 +25,7 @@ public struct Configuration: Hashable, Sendable {
     public var minStackSize: Int
     public var titlebarInset: Double
 
-    /// The strip gets out of the way while the cursor is over it, and registers
-    /// no click actions at all: hiding is the whole interaction, so an icon
-    /// that could be clicked would only ever be clicked by accident.
+    /// Also disables click handling: getting out of the way is the whole interaction (R8).
     public var hideOnHover: Bool
 
     public init(
@@ -66,10 +62,7 @@ public struct Configuration: Hashable, Sendable {
         self.hideOnHover = hideOnHover
     }
 
-    /// Only `--icon-size` must be strictly positive; a zero gap, corner radius
-    /// or border is meaningful, and offsets are signed. Every bound is also a
-    /// magnitude: a finite but absurd value passes sign checks and then produces
-    /// garbage geometry downstream.
+    // Every bound is a magnitude: a finite but absurd value produces garbage geometry.
     public static let maximumLength: Double = 512
     public static let minimumIconSize: Double = 1
     public static let maximumOffset: Double = 100_000
@@ -96,8 +89,8 @@ public struct Configuration: Hashable, Sendable {
         }
     }
 
-    // The isFinite guard is what rejects the inf/nan that `Double("...")` takes;
-    // a NaN would also fail `contains`, but silently.
+    // `Double(_:)` accepts "inf" and "nan"; the bounded `contains` rejects them too,
+    // but only incidentally, so the guard says so outright.
     private static func require(_ value: Double, in range: ClosedRange<Double>, flag: String) throws {
         guard value.isFinite, range.contains(value) else {
             throw ConfigurationError.outOfRange(

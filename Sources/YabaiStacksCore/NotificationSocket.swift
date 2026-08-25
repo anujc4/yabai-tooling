@@ -1,9 +1,7 @@
 import Darwin
 import Foundation
 
-/// A yabai signal action runs a shell command, so the cheapest wake-up we can
-/// arrange is a tiny process that connects here, writes nothing in particular
-/// and exits. The daemon never polls; it blocks in `accept` until yabai fires.
+/// A yabai signal action wakes the daemon by connecting here; it never polls.
 public final class NotificationSocket: @unchecked Sendable {
     public let path: String
     private let lock = NSLock()
@@ -17,14 +15,12 @@ public final class NotificationSocket: @unchecked Sendable {
 
     public static func defaultPath(environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
         if let override = environment["YABAI_STACKS_SOCKET"], !override.isEmpty { return override }
-        // NSTemporaryDirectory is per-user and mode 0700; /tmp is world
-        // writable, so another process could pre-create the path or connect.
+        // NSTemporaryDirectory is per-user and mode 0700; /tmp is world writable.
         let user = environment["USER"] ?? "unknown"
         return NSTemporaryDirectory() + "yabai-stacks_\(user).socket"
     }
 
-    /// Sends one wake-up and returns. Used by the `--notify` path, which must
-    /// stay fast: yabai runs it once per event and waits for it to exit.
+    /// Sends one wake-up and returns. yabai runs this once per event and waits.
     public static func notify(path: String, event: String? = nil, timeout: TimeInterval = 1) throws {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw YabaiError.socketCreationFailed(code: errno) }
@@ -42,32 +38,24 @@ public final class NotificationSocket: @unchecked Sendable {
         guard result == 0 else { throw YabaiError.connectionFailed(path: path, code: errno) }
 
         let payload = Array((event ?? "").utf8)
-        // No event is sent as no bytes: the listener reads to EOF, so an empty
-        // payload already means "nothing to say" without a sentinel byte.
         if !payload.isEmpty {
             _ = payload.withUnsafeBytes { send(fd, $0.baseAddress, $0.count, 0) }
         }
     }
 
-    /// True when something is already accepting on `path`. A stale file left by
-    /// a killed process refuses the connection and is safe to reclaim. The probe
-    /// is a real wake-up rather than a peek: connecting is the only way to tell
-    /// the two apart, and a spurious eventless refresh is harmless.
+    /// True when something is already accepting on `path`. Connecting is the only
+    /// way to tell that apart from a socket file left by a killed process.
     public static func isServed(path: String) -> Bool {
         (try? notify(path: path, timeout: 1)) != nil
     }
 
-    /// How long one peer may take to say its piece. A `--notify` connects and
-    /// writes immediately, so this only ever expires for a peer that has gone
-    /// silent, and it bounds how long such a peer can hold up the queue.
+    /// Bounds how long a peer that has gone silent can hold up the read queue.
     public static let readDeadline: TimeInterval = 0.2
 
-    /// An event name is a `YabaiSignalEvent` raw value; anything longer is not
-    /// one, and reading it would only delay the events behind it.
+    /// An event name is a `YabaiSignalEvent` raw value; anything longer is not one.
     static let maximumPayloadBytes = 256
 
-    /// Calls `onEvent` once per connection, on a background thread. The caller
-    /// is responsible for hopping to whatever queue it needs.
+    /// Calls `onEvent` once per connection, on a background thread.
     public func listen(onEvent: @escaping @Sendable (String?) -> Void) throws {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw YabaiError.socketCreationFailed(code: errno) }
@@ -75,8 +63,7 @@ public final class NotificationSocket: @unchecked Sendable {
         var reuse: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
 
-        // A stale socket file outlives an ungraceful exit and would make bind
-        // fail with EADDRINUSE forever.
+        // A stale socket file outlives an ungraceful exit and fails bind with EADDRINUSE.
         unlink(path)
 
         var address = sockaddr_un()
@@ -89,8 +76,7 @@ public final class NotificationSocket: @unchecked Sendable {
             close(fd)
             throw YabaiError.connectionFailed(path: path, code: errno)
         }
-        // bind() creates the filesystem node, and fchmod on the socket fd does
-        // not reach it on Darwin, so the path is chmod'ed directly.
+        // fchmod on the socket fd does not reach the filesystem node on Darwin.
         _ = chmod(path, 0o600)
         guard Darwin.listen(fd, 32) == 0 else {
             close(fd)
@@ -113,15 +99,9 @@ public final class NotificationSocket: @unchecked Sendable {
                     if errno == EINTR { continue }
                     return
                 }
-                // Reading happens off the accept thread, so a silent peer
-                // cannot stall the loop and leave the daemon deaf at 0% CPU,
-                // and on a *serial* queue, so events are delivered in the order
-                // they were accepted. A concurrent queue reorders them:
-                // `accept` returns when the peer's `connect` completes, but a
-                // real wake-up is a whole process launch before its `send`, so
-                // a connection accepted first can be read last. Mission Control
-                // enter/exit is a toggle, so one inversion parks the strips off
-                // screen until the user opens Mission Control again.
+                // Off the accept thread so a silent peer cannot stall the loop, and
+                // serial: `accept` returns on the peer's `connect`, but its `send` is a
+                // process launch later, so one accepted first can be read last.
                 readQueue.async {
                     let name = Self.readEventName(from: client)
                     close(client)
@@ -131,12 +111,8 @@ public final class NotificationSocket: @unchecked Sendable {
         }
     }
 
-    /// SOCK_STREAM carries no framing, so one `recv` is not one message even
-    /// for twenty bytes: reading to EOF is the only way to know the name is
-    /// whole. A truncated name decodes to something no `YabaiSignalEvent`
-    /// matches, which would silently demote a Mission Control enter to an
-    /// ordinary refresh. The deadline is absolute rather than the per-call idle
-    /// timer `SO_RCVTIMEO` gives, which a dribbling peer can rearm for ever.
+    /// SOCK_STREAM carries no framing, so the name is only whole at EOF. The deadline
+    /// is absolute; `SO_RCVTIMEO` is an idle timer a dribbling peer can rearm.
     static func readEventName(from client: Int32) -> String? {
         let expiry = DispatchTime.now().uptimeNanoseconds
             &+ UInt64((readDeadline * 1_000_000_000).rounded())

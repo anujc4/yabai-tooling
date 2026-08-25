@@ -3,20 +3,13 @@ public enum StripSide: String, Hashable, Sendable, CaseIterable {
     case right
 }
 
-/// One stack's icon strip. Every rect is in the same coordinate space — yabai's
-/// top-left-origin space as built, or AppKit's bottom-left-origin space after
-/// `converted(toAppKitWithPrimaryDisplayHeight:)` flips the whole layout at
-/// once. Nothing here mixes the two.
+/// One stack's icon strip. Every rect is in one coordinate space: yabai's as built,
+/// AppKit's after `converted(toAppKitWithPrimaryDisplayHeight:)` flips the lot.
 public struct StripLayout: Hashable, Sendable {
     public let side: StripSide
     public let frame: Rect
-
-    /// In member order, left to right.
     public let icons: [Rect]
     public let windowIDs: [Int]
-
-    /// Position of the focused member within the strip. Optional because a
-    /// stack on a visible but unfocused space legitimately has none (SPEC 5).
     public let activeIndex: Int?
 
     // Internal so `icons` and `windowIDs` can never be handed in mismatched.
@@ -48,8 +41,7 @@ public struct StripLayout: Hashable, Sendable {
         iconIndex(at: point).flatMap(windowID(forIcon:))
     }
 
-    /// Icon rects relative to `frame.origin`, which is what a click reported as
-    /// `NSEvent.locationInWindow` is relative to once the panel sits on `frame`.
+    /// Relative to `frame.origin`, which is what `NSEvent.locationInWindow` is relative to.
     public var localIcons: [Rect] {
         icons.map { $0.offsetBy(dx: -frame.minX, dy: -frame.minY) }
     }
@@ -86,10 +78,8 @@ public enum StripGeometry {
         }
     }
 
-    /// `.auto` goes right only when the stack's horizontal centre is strictly
-    /// past its own display's centre, so a stack centred exactly on that centre
-    /// — a full-width stack on a single display — resolves left. Without a
-    /// display frame the side cannot be decided, and `.left` is the fallback.
+    /// `.auto` goes right only strictly past the display's centre, so a full-width
+    /// stack resolves left; with no display frame the fallback is `.left`.
     public static func side(
         for stackFrame: Rect,
         position: StripPosition,
@@ -104,11 +94,8 @@ public enum StripGeometry {
         }
     }
 
-    /// Slid — never resized — until it lies inside `bounds` on both axes. When
-    /// the strip is longer than the display on an axis it cannot fit at all, and
-    /// the low edge wins: the overflow is left hanging off the high edge rather
-    /// than the origin being pushed past the low edge, which would hide the
-    /// strip's start and invert the two clamps against each other.
+    /// Slid, never resized. A strip longer than the display cannot fit at all, and the
+    /// low edge wins, so the overflow hangs off the high edge.
     public static func clamped(_ rect: Rect, to bounds: Rect) -> Rect {
         Rect(
             x: clampedOrigin(rect.minX, length: rect.width, low: bounds.minX, high: bounds.maxX),
@@ -122,11 +109,6 @@ public enum StripGeometry {
         max(low, min(origin, high - length))
     }
 
-    /// The whole desktop as one rect. Parking is measured against this rather
-    /// than against the strip's own screen: on a multi-display setup the near
-    /// edge of one screen is an interior edge of the desktop, and a strip sent
-    /// past it lands fully visible on the neighbour — where Mission Control is
-    /// also drawing.
     public static func desktop(of screens: [Rect]) -> Rect? {
         guard let first = screens.first else { return nil }
         let bounds = screens.dropFirst().reduce(first) { union, screen in
@@ -140,15 +122,10 @@ public enum StripGeometry {
         return bounds
     }
 
-    /// Where a strip waits while it is out of the way: past the nearer
-    /// horizontal edge of the whole desktop, so it exits the way it came in and
-    /// is off every display rather than merely off its own. `margin` carries it
-    /// clear of the edge rather than flush against it. A strip centred exactly
-    /// on the desktop's centre has no nearer edge and leaves left, the same
-    /// tie-break `.auto` placement uses. With no desktop there is no edge to
-    /// aim for and twice its own width is far enough.
     public static let parkingMargin: Double = 8
 
+    /// Where a strip waits while it is out of the way: past the nearer horizontal edge
+    /// of the whole desktop, so it is off every display rather than merely off its own.
     public static func parked(_ rect: Rect, beyond desktop: Rect?, margin: Double = parkingMargin) -> Rect {
         guard let desktop else { return rect.offsetBy(dx: -rect.width * 2, dy: 0) }
         let exitsLeft = rect.midX <= desktop.midX
@@ -156,17 +133,8 @@ public enum StripGeometry {
         return rect.offsetBy(dx: dx, dy: 0)
     }
 
-    /// Offsets push the strip away from the corner it is anchored to: a
-    /// positive `--offset-x` moves a left-anchored strip right and a
-    /// right-anchored strip left, so the same value nudges either side inwards.
-    /// A positive `--offset-y` always moves down, matching yabai's top-left
-    /// origin and the strip's top anchoring.
-    ///
-    /// The result is clamped to the **display**, not to the stack frame: a
-    /// narrow leaf carrying many icons has no placement that both fits and
-    /// labels only its own frame, and a strip drawn off-display labels nothing
-    /// at all. Overflowing a neighbouring stack is the lesser evil, so
-    /// overflowing the stack frame stays legal.
+    /// A positive `--offset-x` nudges either side inwards. The frame is clamped to the
+    /// display, not to the stack frame, so a narrow leaf's strip stays on screen.
     public static func layout(
         stackFrame: Rect,
         windowIDs: [Int],
@@ -178,9 +146,7 @@ public enum StripGeometry {
 
         let stripSize = size(iconCount: windowIDs.count, configuration: configuration)
         let stripSide = side(for: stackFrame, position: configuration.position, displayFrame: displayFrame)
-        // macOS puts the close/minimise/zoom buttons at the window's top-left,
-        // so only a left-anchored strip collides with them and only it is
-        // pushed clear. Anchoring right needs no inset.
+        // The window buttons sit at the top-left, so only a left strip is inset.
         let originX = switch stripSide {
         case .left: stackFrame.minX + configuration.offsetX + configuration.titlebarInset
         case .right: stackFrame.maxX - stripSize.width - configuration.offsetX
@@ -191,8 +157,7 @@ public enum StripGeometry {
         )
         let frame = displayFrame.map { clamped(anchored, to: $0) } ?? anchored
 
-        // Laid out in yabai's top-left-origin space, so index 0 sits at the
-        // smallest y and stays the topmost icon after the flip to AppKit.
+        // Laid out top-left-origin, so index 0 stays the topmost icon after the flip.
         let step = configuration.iconSize + configuration.iconSpacing
         let icons = windowIDs.indices.map { index in
             let advance = Double(index) * step
@@ -237,8 +202,7 @@ public enum StripGeometry {
         )
     }
 
-    /// The display frame comes from yabai's `--displays` query, not `NSScreen`,
-    /// so the decision stays in yabai's coordinate space.
+    /// The display frame comes from yabai, so the decision stays in yabai's space.
     public static func layout(
         stack: Stack,
         displays: [YabaiDisplay],

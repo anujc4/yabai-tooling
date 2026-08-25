@@ -25,8 +25,7 @@ public struct YabaiWindow: Codable, Hashable, Sendable {
     public let level: Int
     public let subrole: String
 
-    /// 0 means the window is not stacked. Values >= 1 are 1-based, contiguous
-    /// positions within the stack; yabai returns members in descending order.
+    /// 0 means unstacked; >= 1 is a 1-based position, returned descending (SPEC 1, 3).
     public let stackIndex: Int
 
     public let isRootWindow: Bool
