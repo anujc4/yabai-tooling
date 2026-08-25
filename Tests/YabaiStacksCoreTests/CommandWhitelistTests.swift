@@ -108,7 +108,7 @@ struct CommandWhitelistTests {
     func addedSignalsAreLabelledOurs() {
         for event in YabaiSignalEvent.allCases {
             let argv = YabaiCommand.addSignal(event: event, notifying: "/usr/local/bin/yabai-stacks", socket: "/tmp/s.sock").argv
-            let label = try? #require(argv.first { $0.hasPrefix("label=") })
+            let label = argv.first { $0.hasPrefix("label=") }
             #expect(label?.hasPrefix("label=" + YabaiSignalEvent.labelPrefix) == true)
             #expect(argv.contains("event=" + event.rawValue))
         }

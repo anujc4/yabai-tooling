@@ -267,8 +267,11 @@ struct KeyedCacheTests {
         let (cache, recorder) = makeCache(capacity: 64)
         recorder.loadDelay = 0.002
 
+        // KeyedCache does not advertise Sendable — the loader is an ordinary
+        // closure — but it is NSLock-guarded, which is what this test exercises.
+        let shared = Unsafe(cache)
         DispatchQueue.concurrentPerform(iterations: 400) { iteration in
-            _ = cache.value(for: iteration % 8)
+            _ = shared.value.value(for: iteration % 8)
         }
         recorder.loadDelay = 0
 
@@ -294,4 +297,9 @@ struct KeyedCacheTests {
         #expect(cache.value(for: 1) == nil)
         #expect(recorder.keys == [1, 2, 3, 1])
     }
+}
+
+private struct Unsafe<Value>: @unchecked Sendable {
+    let value: Value
+    init(_ value: Value) { self.value = value }
 }
