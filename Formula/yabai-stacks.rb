@@ -2,7 +2,7 @@ class YabaiStacks < Formula
   desc "Stack indicators for yabai: app icons for stacked windows, click to focus"
   homepage "https://github.com/anujc4/yabai-tooling"
   url "https://github.com/anujc4/yabai-tooling/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "d6ab9897a02f0ab70dd6ff257af85de5df35494d2c5a4e172d4c724cf5d29be9"
+  sha256 "3984afebfa9f0e91c87cbbdac6ec3f745057166f7ad7dc6128f9d24603446901"
   license "MIT"
   head "https://github.com/anujc4/yabai-tooling.git", branch: "main"
 
