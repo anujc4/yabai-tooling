@@ -54,8 +54,6 @@ final class StripView: NSView {
         background.frame = bounds
         background.backgroundColor = configuration.backgroundColor.cgColor
         background.cornerRadius = configuration.cornerRadius
-        background.borderWidth = configuration.borderWidth
-        background.borderColor = configuration.activeColor.cgColor
 
         layoutIcons(render: render, icons: icons)
         layoutHighlight(render: render)
@@ -83,7 +81,9 @@ final class StripView: NSView {
     }
 
     /// The active member is ringed rather than tinted, so the icon itself stays
-    /// recognisable. A stack on a visible but unfocused space has none (SPEC 5).
+    /// recognisable. The strip itself is deliberately unbordered: the ring is
+    /// the only thing that needs to draw the eye. A stack on a visible but
+    /// unfocused space has no active member at all (SPEC 5).
     private func layoutHighlight(render: StripRender) {
         guard let active = render.layout.activeIndex else {
             highlight.isHidden = true

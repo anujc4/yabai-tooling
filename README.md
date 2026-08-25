@@ -48,7 +48,7 @@ next launch rather than accumulating.
 | `--active-color <color>` | `0xffd65d0e` | Ring drawn around the focused icon |
 | `--background-color <color>` | `0x801d2021` | Strip background |
 | `--inactive-opacity <0..1>` | `0.45` | Opacity of unfocused icons |
-| `--border-width <pt>` | `0` | Strip border |
+| `--border-width <pt>` | `0` | Thickness of the ring around the active icon |
 | `--position auto\|left\|right` | `auto` | Which corner of the stack |
 | `--orientation horizontal\|vertical` | `vertical` | Which way icons run |
 | `--offset-x <pt>` | `0` | Nudge inwards from the anchored corner |

@@ -42,7 +42,7 @@ public enum ConfigurationParser {
       --active-color <0xAARRGGBB>   default 0xffd65d0e
       --background-color <0xAARRGGBB> default 0x801d2021
       --inactive-opacity <0..1>     default 0.45
-      --border-width <pt>           default 0
+      --border-width <pt>           default 0   ring around the active icon
       --position auto|left|right    default auto
       --orientation horizontal|vertical  default vertical
       --offset-x <pt>               default 0
