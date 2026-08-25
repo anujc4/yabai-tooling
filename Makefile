@@ -11,7 +11,7 @@ TEST_LOG := .build/last-test-run.log
 PREFIX ?= /usr/local
 BINDIR := $(PREFIX)/bin
 
-.PHONY: all build release run test install uninstall clean
+.PHONY: all build release run test install uninstall formula-sha clean
 
 all: build
 
@@ -46,6 +46,11 @@ install: release
 
 uninstall:
 	rm -f $(BINDIR)/yabai-stacks
+
+# The sha256 the Homebrew formula needs after tagging a release.
+formula-sha:
+	@test -n "$(VERSION)" || { echo "usage: make formula-sha VERSION=v0.1.0"; exit 1; }
+	@curl -sL https://github.com/anujc4/yabai-tooling/archive/refs/tags/$(VERSION).tar.gz | shasum -a 256 | cut -d' ' -f1
 
 clean:
 	$(SWIFT) package clean

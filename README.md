@@ -16,6 +16,21 @@ does. Written in Swift with no dependencies.
 
 ## Install
 
+### Homebrew
+
+```sh
+brew tap anujc4/yabai-tooling https://github.com/anujc4/yabai-tooling
+brew install yabai-stacks
+```
+
+`brew upgrade yabai-stacks` picks up later releases; `brew install --HEAD
+anujc4/yabai-tooling/yabai-stacks` builds whatever is on `main`.
+
+The formula builds from source, so the machine needs a Swift 6 toolchain —
+either Xcode or the Command Line Tools (`xcode-select --install`).
+
+### From source
+
 ```sh
 git clone https://github.com/anujc4/yabai-tooling.git
 cd yabai-tooling
