@@ -9,7 +9,6 @@ class YabaiStacks < Formula
   # Swift 6 and the AppKit APIs this uses need macOS 14 or later, matching
   # Package.swift's platform floor.
   depends_on macos: :sonoma
-  depends_on :macos
 
   def install
     # SwiftPM writes into .build, which Homebrew's sandbox forbids.
